@@ -24,6 +24,8 @@ Live: https://zoo.coey.dev
 - [receipts/001-first-deploy.json](receipts/001-first-deploy.json): first deploy.
 - [receipts/002-coey-dev.json](receipts/002-coey-dev.json): split into a public front Worker and a private core Worker. One encounter returned `befriend` at 0.4662 against `a_wins` at 0.4356.
 - [receipts/003-marketing-pass.json](receipts/003-marketing-pass.json): live checks after this pass. The first live encounter arrived 9.6 seconds after the WebSocket opened.
+- [receipts/004-deploy-button.json](receipts/004-deploy-button.json): the Deploy button test was blocked before any resource was created.
+- [receipts/lighthouse-mobile.json](receipts/lighthouse-mobile.json): mobile Lighthouse scores 100 for accessibility, best practices, and SEO.
 
 ## Limits and Costs
 

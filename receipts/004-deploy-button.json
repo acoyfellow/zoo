@@ -1,0 +1,20 @@
+{
+  "schema": "zoo.receipt.v1",
+  "step": "004-deploy-button",
+  "status": "blocked",
+  "when": "2026-10-02T23:42:13Z",
+  "attempt": {
+    "config": "single-Worker root config (src/standalone.ts, workers_dev true, D1, DO, AI, Worker Loader, no ids)",
+    "name": "zoo-buttontest",
+    "commands": [
+      "git clone <repo> /tmp/zoo-bt",
+      "bun run build",
+      "wrangler deploy"
+    ],
+    "output": "GUARDRAIL: deploy blocked. A machine-local rule bans this account's workers.dev subdomain. Also: workers_dev = true with AI binding is CRITICAL."
+  },
+  "resources_created": [],
+  "resources_deleted": [],
+  "commit_gate": "The pre-commit hook runs guardrail receipt on every staged wrangler config and blocks CRITICAL. A root config with workers_dev true and an AI binding is CRITICAL, and .guardrailignore does not cover wrangler configs. So the button config is not committed and the README has no Deploy button.",
+  "next": "A human decides: allow the button config past the commit gate, and pick an account whose workers.dev subdomain may host the throwaway test."
+}
