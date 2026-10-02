@@ -1,0 +1,109 @@
+.gitignore
+  s_fc002e6ac2c2f5::t_23b3b781e9e863 1-4
+.guardrail/deploys/2026-10-02T18-22-52-350Z.json
+  s_4f3d73861137de::t_62d0410c00737c 1-63
+.guardrail/deploys/2026-10-02T18-58-55-078Z.json
+  s_5f86db03525984::t_ea8454caf2aa54 1-63
+.guardrail/deploys/2026-10-02T19-15-47-592Z.json
+  s_fc002e6ac2c2f5::t_9fec9d8237bddd 1-42
+.guardrail/deploys/2026-10-02T19-15-49-731Z.json
+  s_fc002e6ac2c2f5::t_e0eeb630838f97 1-47
+.guardrail/deploys/2026-10-02T19-16-16-715Z.json
+  s_fc002e6ac2c2f5::t_dfe02f93b8eec9 1-42
+.guardrail/deploys/2026-10-02T19-16-19-005Z.json
+  s_fc002e6ac2c2f5::t_c1dd1134d9073a 1-47
+.guardrail/deploys/2026-10-02T19-16-48-938Z.json
+  s_fc002e6ac2c2f5::t_81294388aac461 1-42
+.guardrail/deploys/2026-10-02T19-16-50-203Z.json
+  s_fc002e6ac2c2f5::t_9747034822f11f 1-47
+.pi/fresh-session-handoff/state.json
+  s_fc002e6ac2c2f5::t_a7b25322d30ae6 1-9
+README.md
+  s_fc002e6ac2c2f5::t_be6f14c0007489 1-28
+biome.json
+  s_4f3d73861137de::t_b165c6e0261e34 1-17
+bun.lock
+  s_4f3d73861137de::t_5b588f3eca63ba 1-275
+core/wrangler.jsonc
+  s_fc002e6ac2c2f5::t_863c7b7714e2e1 1-14
+findings.md
+  s_4f3d73861137de::t_901c3a15bcc203 1-9
+package.json
+  s_fc002e6ac2c2f5::t_7dd4ce0a4cfb1a 1-30
+receipts/001-first-deploy.json
+  s_4f3d73861137de::t_17a0a5404e3182 1-60
+receipts/002-coey-dev.json
+  s_fc002e6ac2c2f5::t_3807fbae6c462c 1-16
+src/front/index.ts
+  s_fc002e6ac2c2f5::t_e51b6a418091a8 1-24
+src/web/App.svelte
+  s_4f3d73861137de::t_66fd2d36292d80 1-120
+src/web/index.html
+  s_fc002e6ac2c2f5::t_58c7dfb5549b07 1-12
+src/web/main.ts
+  s_fc002e6ac2c2f5::t_af99dc4091d81b 1-6
+src/web/messages.ts
+  s_fc002e6ac2c2f5::t_caff41fc7e2471 1-26
+src/worker/ai-models.d.ts
+  s_fc002e6ac2c2f5::t_5adbcdf5a2825f 1-8
+src/worker/ai.ts
+  s_5ddfc8f4108175::t_e5ac123518cb84 1-85
+src/worker/behavior.ts
+  s_fc002e6ac2c2f5::t_62beef2580d6fb 1-157
+src/worker/index.ts
+  s_fc002e6ac2c2f5::t_fa601884ff9375 1-80
+src/worker/schema.ts
+  s_4f3d73861137de::t_cf4e01907532e4 1-79
+src/worker/world.ts
+  s_fc002e6ac2c2f5::t_e5b9e3e14a78db 1-297
+status.json
+  s_fc002e6ac2c2f5::t_8738992de6365b 1-7
+test/behavior.test.ts
+  s_5ddfc8f4108175::t_58adc9cdc8049a 1-65
+tsconfig.json
+  s_fc002e6ac2c2f5::t_a18e23e51f306a 1-16
+tsconfig.web.json
+  s_fc002e6ac2c2f5::t_fa4fb6cb770237 1-14
+vite.config.ts
+  s_fc002e6ac2c2f5::t_4a706c48bf7e3e 1-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "053d8e64bc4be9a33c0bf0b6184bd7784ad48a96",
+  "prompts": {},
+  "sessions": {
+    "s_4f3d73861137de": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019febf7-4b34-7b21-970a-5f277fcc20a8",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Jordan Coeyman <coeyman@gmail.com>"
+    },
+    "s_5ddfc8f4108175": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0fc06-d951-77a8-8358-cd5dae6891bd",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Jordan Coeyman <coeyman@gmail.com>"
+    },
+    "s_5f86db03525984": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0f8ed-6d1c-75dc-a1fe-8dce6a49abbc",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Jordan Coeyman <coeyman@gmail.com>"
+    },
+    "s_fc002e6ac2c2f5": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0aab9-f490-72e1-8d73-920246e8faec",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Jordan Coeyman <coeyman@gmail.com>"
+    }
+  }
+}
