@@ -1,0 +1,19 @@
+.github/workflows/ci.yml
+  s_9543e9b013f284::t_4ff3bd81bbdeb1 13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "d29402da4910af8d0e5bd317ed84c31254e7672f",
+  "prompts": {},
+  "sessions": {
+    "s_9543e9b013f284": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019e27e9-dbc8-74d4-83bf-3b7f2697402e",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Jordan Coeyman <coeyman@gmail.com>"
+    }
+  }
+}
