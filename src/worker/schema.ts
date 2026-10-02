@@ -9,6 +9,7 @@ export const ActionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("say"), text: z.string().max(80) }),
   z.object({ type: z.literal("remember"), key: z.string().max(40), value: z.string().max(200) }),
 ]);
+
 export type Action = z.infer<typeof ActionSchema>;
 
 export const TickResult = z.object({
@@ -16,6 +17,7 @@ export const TickResult = z.object({
   actions: z.array(ActionSchema).max(20),
   error: z.string().optional(),
 });
+
 export type TickResult = z.infer<typeof TickResult>;
 
 export const CreatureState = z.object({
@@ -38,6 +40,7 @@ export const ClefOutput = z.object({
     }),
   }),
 });
+
 export type ClefOutput = z.infer<typeof ClefOutput>;
 
 export const CreatureView = z.object({
@@ -50,12 +53,14 @@ export const CreatureView = z.object({
   said: z.string(),
   generation: z.number(),
 });
+
 export type CreatureView = z.infer<typeof CreatureView>;
 
 export const WorldEvent = z.object({
   at: z.number(),
   text: z.string(),
 });
+
 export type WorldEvent = z.infer<typeof WorldEvent>;
 
 export const EncounterView = z.object({
@@ -65,6 +70,7 @@ export const EncounterView = z.object({
   outcome: z.enum(["a_wins", "b_wins", "befriend"]),
   probabilities: z.object({ a_wins: z.number(), b_wins: z.number(), befriend: z.number() }),
 });
+
 export type EncounterView = z.infer<typeof EncounterView>;
 
 export const WorldMessage = z.discriminatedUnion("type", [
@@ -77,6 +83,7 @@ export const WorldMessage = z.discriminatedUnion("type", [
   z.object({ type: z.literal("event"), event: WorldEvent }),
   z.object({ type: z.literal("encounter"), encounter: EncounterView }),
 ]);
+
 export type WorldMessage = z.infer<typeof WorldMessage>;
 
 export const NewCreature = z.object({
@@ -85,6 +92,7 @@ export const NewCreature = z.object({
   code: z.string(),
   generation: z.number().int(),
 });
+
 export type NewCreature = z.infer<typeof NewCreature>;
 
 export const SpawnResponse = z.object({

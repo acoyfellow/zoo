@@ -40,20 +40,25 @@ const BANNED_WORDS = [
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
     const path = join(dir, entry);
+
     if (statSync(path).isDirectory()) return sourceFiles(path);
+
     return /\.(svelte|ts)$/.test(entry) ? [path] : [];
   });
 }
 
 function hitsIn(path: string): string[] {
   const lines = readFileSync(path, "utf8").split("\n");
+
   return lines.flatMap((line, index) => {
     const lower = line.toLowerCase();
+
     const found = [
       ...(line.includes(ARROW) ? ["arrow U+2192"] : []),
       ...BANNED_PHRASES.filter((phrase) => lower.includes(phrase.toLowerCase())),
       ...BANNED_WORDS.filter((word) => new RegExp(`\\b${word}`, "i").test(line)),
     ];
+
     return found.map((term) => `${path}:${index + 1}: ${term}`);
   });
 }
@@ -65,7 +70,11 @@ const files = [
   ...sourceFiles("src/front"),
   ...sourceFiles("src/worker"),
 ];
+
 const hits = files.flatMap(hitsIn);
+
 for (const hit of hits) console.error(hit);
+
 if (hits.length > 0) process.exit(1);
+
 console.log(`copy-check: ${files.length} files clean`);

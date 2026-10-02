@@ -2,7 +2,9 @@ import { BEHAVIOR_HEADER, type ValidationResult, validateBehavior } from "./beha
 import { type ClefOutput, ClefOutput as ClefOutputSchema, ModelOutput } from "./schema";
 
 export const CODE_MODEL = "@cf/moonshotai/kimi-k2.7-code";
+
 export const JUDGE_MODEL = "@cf/cloudflare/clef";
+
 const GATEWAY = { gateway: { id: "default" } };
 
 export const CREATURE_API_PROMPT = `You write behavior modules for tiny glowing creatures in a 800x800 terrarium.
@@ -19,15 +21,17 @@ It is called once per tick. Available:
 - view.size: 800
 Rules: no imports, no fetch, no eval, no while loops, no globals, under 40 lines, deterministic or Math.random only.`;
 
-function textOf(output: unknown): string {
-  const parsed = ModelOutput.safeParse(output);
+function textOf(parsed: ReturnType<typeof ModelOutput.safeParse>): string {
   if (!parsed.success) return "";
+
   if ("response" in parsed.data) return parsed.data.response;
+
   return parsed.data.choices[0]?.message.content ?? "";
 }
 
 export async function writeBehavior(ai: Ai, description: string): Promise<ValidationResult> {
   let lastReason = "no attempt";
+
   for (let attempt = 0; attempt < 2; attempt++) {
     const output = await ai.run(
       CODE_MODEL,
@@ -44,11 +48,14 @@ export async function writeBehavior(ai: Ai, description: string): Promise<Valida
       },
       GATEWAY,
     );
-    const text = textOf(output);
+
+    const text = textOf(ModelOutput.safeParse(output));
     const result = validateBehavior(text);
+
     if (result.ok) return result;
     lastReason = text.length === 0 ? `empty model output: ${JSON.stringify(output).slice(0, 300)}` : result.reason;
   }
+
   return { ok: false, reason: lastReason };
 }
 
@@ -81,5 +88,6 @@ export async function judgeEncounter(ai: Ai, a: Fighter, b: Fighter): Promise<Cl
     },
     GATEWAY,
   );
+
   return ClefOutputSchema.parse(output).answers.outcome;
 }

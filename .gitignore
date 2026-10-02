@@ -2,3 +2,10 @@ node_modules
 dist
 .wrangler
 worker-configuration.d.ts
+.cursor/
+.pi/
+.guardrail/
+.vscode/
+.idea/
+.DS_Store
+.dev.vars

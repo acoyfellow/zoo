@@ -11,20 +11,31 @@ import {
 } from "./messages";
 
 const WORLD = 800;
+
 const MARGIN = 40;
 
 type Connection = "connecting" | "open" | "lost";
 
 let creatures = $state<Creature[]>([]);
+
 let events = $state<WorldEvent[]>([]);
+
 let encounters = $state<Encounter[]>([]);
+
 let lineage = $state<LineageCreature[]>([]);
+
 let lineageState = $state<"idle" | "loading" | "ready" | "error">("idle");
+
 let connection = $state<Connection>("connecting");
+
 let description = $state("");
+
 let status = $state("");
+
 let busy = $state(false);
+
 let lastCode = $state("");
+
 let canvas: HTMLCanvasElement | undefined = $state();
 
 function clampPixel(value: number): number {
@@ -37,12 +48,13 @@ function percent(value: number): string {
 
 function outcomeText(encounter: Encounter): string {
   if (encounter.outcome === "befriend") return `${encounter.a} and ${encounter.b} became friends`;
+
   return encounter.outcome === "a_wins" ? `${encounter.a} won` : `${encounter.b} won`;
 }
 
-function parseMessage(data: unknown): ReturnType<typeof WorldMessage.safeParse> | null {
+function parseMessage(data: string): ReturnType<typeof WorldMessage.safeParse> | null {
   try {
-    return WorldMessage.safeParse(JSON.parse(String(data)));
+    return WorldMessage.safeParse(JSON.parse(data));
   } catch {
     return null;
   }
@@ -54,13 +66,18 @@ function connect(): void {
   socket.onopen = () => {
     connection = "open";
   };
+
   socket.onmessage = (message) => {
-    const parsed = parseMessage(message.data);
+    const parsed = parseMessage(String(message.data));
+
     if (!parsed?.success) return;
     const data = parsed.data;
+
     if (data.type === "snapshot") {
       creatures = data.creatures;
+
       if (data.events.length > 0) events = data.events;
+
       if (data.encounters.length > 0) encounters = data.encounters;
     } else if (data.type === "event") {
       events = [...events.slice(-29), data.event];
@@ -69,6 +86,7 @@ function connect(): void {
       void loadLineage();
     }
   };
+
   socket.onclose = () => {
     connection = "lost";
     setTimeout(connect, 2000);
@@ -77,11 +95,13 @@ function connect(): void {
 
 function draw(time: number): void {
   const context = canvas?.getContext("2d");
+
   if (canvas && context) {
     const scale = canvas.width / WORLD;
     context.fillStyle = "rgba(2, 8, 6, 0.35)";
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.font = `${11 * scale}px ui-monospace, monospace`;
+
     for (const creature of creatures) {
       const pulse = 1 + Math.sin(time / 300 + creature.hue) * 0.15;
       const radius = (6 + Math.min(creature.energy, 20) * 0.5) * pulse * scale;
@@ -99,17 +119,21 @@ function draw(time: number): void {
       context.textAlign = right ? "left" : "right";
       const labelX = right ? x + radius : x - radius;
       context.fillText(creature.name, labelX, Math.max(12 * scale, y - radius));
+
       if (creature.said) context.fillText(`"${creature.said}"`, labelX, y + radius + 10 * scale);
     }
   }
+
   requestAnimationFrame(draw);
 }
 
 async function loadLineage(): Promise<void> {
   if (lineageState === "idle") lineageState = "loading";
+
   try {
     const response = await fetch("/api/lineage");
     const parsed = LineageReply.safeParse(await response.json());
+
     if (!response.ok || !parsed.success) throw new Error("bad lineage");
     lineage = parsed.data.creatures;
     lineageState = "ready";
@@ -120,25 +144,31 @@ async function loadLineage(): Promise<void> {
 
 function nameOf(id: string | null): string {
   if (!id) return "";
+
   return lineage.find((c) => c.id === id)?.name ?? "an older creature";
 }
 
 function parentsOf(creature: LineageCreature): string {
   if (!creature.parent_a) return "first generation";
+
   if (creature.parent_a === creature.parent_b) return `child of ${nameOf(creature.parent_a)}`;
+
   return `child of ${nameOf(creature.parent_a)} and ${nameOf(creature.parent_b)}`;
 }
 
 async function hatch(): Promise<void> {
   busy = true;
   status = "The model is writing a behavior. This can take up to one minute.";
+
   try {
     const response = await fetch("/api/creatures", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ description }),
     });
+
     const reply = SpawnReply.safeParse(await response.json());
+
     if (!reply.success) {
       status = "The server sent an answer that the page cannot read. Try again.";
     } else if ("error" in reply.data) {

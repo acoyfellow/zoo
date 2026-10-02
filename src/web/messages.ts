@@ -10,9 +10,11 @@ export const Creature = z.object({
   said: z.string(),
   generation: z.number(),
 });
+
 export type Creature = z.infer<typeof Creature>;
 
 export const WorldEvent = z.object({ at: z.number(), text: z.string() });
+
 export type WorldEvent = z.infer<typeof WorldEvent>;
 
 export const Encounter = z.object({
@@ -22,6 +24,7 @@ export const Encounter = z.object({
   outcome: z.enum(["a_wins", "b_wins", "befriend"]),
   probabilities: z.object({ a_wins: z.number(), b_wins: z.number(), befriend: z.number() }),
 });
+
 export type Encounter = z.infer<typeof Encounter>;
 
 export const WorldMessage = z.discriminatedUnion("type", [
@@ -44,6 +47,7 @@ export const LineageCreature = z.object({
   fate: z.string().nullable().catch(null),
   created_at: z.number(),
 });
+
 export type LineageCreature = z.infer<typeof LineageCreature>;
 
 export const LineageReply = z.object({ creatures: z.array(LineageCreature) });

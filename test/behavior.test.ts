@@ -68,6 +68,7 @@ describe("world math", () => {
 describe("starter creatures", () => {
   test("every starter passes the validator and has a distinct behavior", () => {
     expect(STARTERS.length).toBe(4);
+
     for (const starter of STARTERS) expect(validateBehavior(starter.code)).toEqual({ ok: true, code: starter.code });
     expect(new Set(STARTERS.map((s) => s.code)).size).toBe(4);
   });
@@ -78,6 +79,7 @@ describe("schemas", () => {
     const parsed = ClefOutput.parse({
       answers: { outcome: { type: "choice", choice: "befriend", probabilities: { befriend: 0.7 }, confidence: 0.6 } },
     });
+
     expect(parsed.answers.outcome.choice).toBe("befriend");
   });
   test("tick result rejects unknown actions", () => {

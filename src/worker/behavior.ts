@@ -1,5 +1,7 @@
 export const WORLD_SIZE = 800;
+
 export const MAX_CODE_LENGTH = 4000;
+
 export const BEHAVIOR_HEADER = "export default function behave(api, view) {";
 
 const FORBIDDEN = [
@@ -23,6 +25,7 @@ export function extractCode(raw: string): string {
   const fenced = raw.match(/```(?:js|javascript)?\s*\n([\s\S]*?)```/);
   const body = fenced?.[1] ?? raw;
   const start = body.indexOf("export default function");
+
   return (start >= 0 ? body.slice(start) : body).trim();
 }
 
@@ -31,18 +34,26 @@ export function stripComments(code: string): string {
   const star = String.fromCharCode(42);
   const block = new RegExp(`\\${slash}\\${star}[\\s\\S]*?\\${star}\\${slash}`, "g");
   const line = new RegExp(`(^|[^:"'])\\${slash}\\${slash}.*$`, "gm");
+
   return code.replace(block, "").replace(line, "$1");
 }
 
 export function validateBehavior(raw: string): ValidationResult {
   const code = stripComments(extractCode(raw)).trim();
+
   if (code.length === 0) return { ok: false, reason: "empty" };
+
   if (code.length > MAX_CODE_LENGTH) return { ok: false, reason: "too long" };
+
   if (!code.startsWith(BEHAVIOR_HEADER)) return { ok: false, reason: "missing behave header" };
+
   if (!code.endsWith("}")) return { ok: false, reason: "unterminated" };
   const hit = FORBIDDEN.find((word) => code.includes(word)) ?? (/(^|[^.\w])self\b/.test(code) ? "self" : undefined);
+
   if (hit) return { ok: false, reason: `forbidden token: ${hit}` };
+
   if ((code.match(/export /g) ?? []).length !== 1) return { ok: false, reason: "multiple exports" };
+
   return { ok: true, code };
 }
 
@@ -53,6 +64,7 @@ export function asNamedFunction(code: string, name: string): string {
 export function mergeBehaviors(a: string, b: string, suffix: string): string {
   const left = `pa_${suffix}`;
   const right = `pb_${suffix}`;
+
   return [
     BEHAVIOR_HEADER,
     `  ${asNamedFunction(a, left)};`,
@@ -138,28 +150,38 @@ export function clamp(value: number, min: number, max: number): number {
 
 export const EDGE_MARGIN = 40;
 
-export function clampToWorld(x: number, y: number): { x: number; y: number } {
+export interface WorldPoint {
+  x: number;
+  y: number;
+}
+
+export function clampToWorld(x: number, y: number): WorldPoint {
   const safeX = Number.isFinite(x) ? x : WORLD_SIZE / 2;
   const safeY = Number.isFinite(y) ? y : WORLD_SIZE / 2;
+
   return {
     x: clamp(safeX, EDGE_MARGIN, WORLD_SIZE - EDGE_MARGIN),
     y: clamp(safeY, EDGE_MARGIN, WORLD_SIZE - EDGE_MARGIN),
   };
 }
 
-export function applyMove(x: number, y: number, dx: number, dy: number): { x: number; y: number } {
+export function applyMove(x: number, y: number, dx: number, dy: number): WorldPoint {
   const step = 12;
+
   return clampToWorld(x + clamp(dx, -step, step), y + clamp(dy, -step, step));
 }
 
 export function hueFor(id: string): number {
   let hash = 0;
+
   for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) % 360;
+
   return hash;
 }
 
 export function nameFrom(description: string): string {
   const words = description.match(/[A-Za-z]{3,}/g) ?? ["glim"];
   const pick = words.slice(-1)[0] ?? "glim";
+
   return pick.slice(0, 1).toUpperCase() + pick.slice(1, 10).toLowerCase();
 }

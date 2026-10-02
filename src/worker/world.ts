@@ -17,7 +17,9 @@ import {
 import { STARTER_COUNT, STARTERS } from "./starters";
 
 const TICK_MS = 1500;
+
 const MEET_DISTANCE = 24;
+
 const MAX_ALIVE = 200;
 
 const Row = z.object({
@@ -31,6 +33,7 @@ const Row = z.object({
   generation: z.number(),
   cooldown_until: z.number(),
 });
+
 type Row = z.infer<typeof Row>;
 
 export class World extends DurableObject<Env> {
@@ -57,6 +60,7 @@ export class World extends DurableObject<Env> {
 
   private view(row: Row): CreatureView {
     const position = clampToWorld(row.x, row.y);
+
     return {
       id: row.id,
       name: row.name,
@@ -71,6 +75,7 @@ export class World extends DurableObject<Env> {
 
   private broadcast(message: WorldMessage): void {
     const data = JSON.stringify(message);
+
     for (const socket of this.ctx.getWebSockets()) {
       try {
         socket.send(data);
@@ -94,6 +99,7 @@ export class World extends DurableObject<Env> {
         modules: { "creature.js": creatureModule(row.code) },
         globalOutbound: null,
       }));
+
       return { class: worker.getDurableObjectClass("Creature") };
     });
   }
@@ -105,6 +111,7 @@ export class World extends DurableObject<Env> {
   async addCreature(input: NewCreature, near?: { x: number; y: number }): Promise<{ alive: number }> {
     const creature = NewCreatureSchema.parse(input);
     const alive = this.rows().length;
+
     if (alive >= MAX_ALIVE) throw new Error("world is full");
     this.ctx.storage.sql.exec(
       "INSERT INTO creatures (id, name, code, x, y, energy, generation) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -118,11 +125,13 @@ export class World extends DurableObject<Env> {
     );
     this.announce(`${creature.name} hatched`);
     await this.ensureAlarm();
+
     return { alive: alive + 1 };
   }
 
   private async topUpStarters(): Promise<void> {
     const missing = STARTER_COUNT - this.rows().length;
+
     for (const starter of STARTERS.slice(0, Math.max(0, missing))) {
       const id = crypto.randomUUID();
       await this.env.DB.prepare(
@@ -153,6 +162,7 @@ export class World extends DurableObject<Env> {
       }),
     );
     await this.ensureAlarm();
+
     return new Response(null, { status: 101, webSocket: pair[0] });
   }
 
@@ -162,15 +172,20 @@ export class World extends DurableObject<Env> {
 
   private neighborsOf(row: Row, all: Row[]) {
     return all
-      .filter((other) => other.id !== row.id)
-      .map((other) => ({
-        name: other.name,
-        x: other.x,
-        y: other.y,
-        dx: other.x - row.x,
-        dy: other.y - row.y,
-        distance: Math.hypot(other.x - row.x, other.y - row.y),
-      }))
+      .flatMap((other) =>
+        other.id === row.id
+          ? []
+          : [
+              {
+                name: other.name,
+                x: other.x,
+                y: other.y,
+                dx: other.x - row.x,
+                dy: other.y - row.y,
+                distance: Math.hypot(other.x - row.x, other.y - row.y),
+              },
+            ],
+      )
       .sort((p, q) => p.distance - q.distance)
       .slice(0, 5);
   }
@@ -182,22 +197,29 @@ export class World extends DurableObject<Env> {
       neighbors: this.neighborsOf(row, all),
       size: WORLD_SIZE,
     };
+
     let result: TickResult;
+
     try {
       const response = await this.facet(row).fetch("https://creature/tick", {
         method: "POST",
         body: JSON.stringify(view),
       });
+
       result = TickResult.parse(await response.json());
     } catch (error) {
       result = { ok: false, actions: [], error: String(error) };
     }
+
     let { x, y } = row;
     let said = row.said;
+
     for (const action of result.actions) {
       if (action.type === "move") ({ x, y } = applyMove(x, y, action.dx, action.dy));
+
       if (action.type === "say") said = action.text;
     }
+
     const energy = Math.max(0, row.energy - (result.ok ? 0.01 : 0.5));
     this.ctx.storage.sql.exec(
       "UPDATE creatures SET x = ?, y = ?, said = ?, energy = ? WHERE id = ?",
@@ -214,10 +236,13 @@ export class World extends DurableObject<Env> {
     const before = this.rows();
     await Promise.all(before.map((row) => this.stepCreature(row, before)));
     const after = this.rows();
+
     for (const row of after.filter((r) => r.energy <= 0)) await this.fade(row, "ran out of energy");
+
     if (this.ctx.getWebSockets().length > 0) await this.topUpStarters();
     this.broadcast({ type: "snapshot", creatures: this.rows().map((r) => this.view(r)), events: [], encounters: [] });
     this.findEncounter(this.rows());
+
     if (this.rows().length > 0 || this.ctx.getWebSockets().length > 0)
       await this.ctx.storage.setAlarm(Date.now() + TICK_MS);
   }
@@ -226,11 +251,13 @@ export class World extends DurableObject<Env> {
     if (this.judging) return;
     const now = Date.now();
     const ready = all.filter((r) => r.cooldown_until < now);
+
     for (const a of ready) {
       for (const b of ready) {
         if (a.id < b.id && Math.hypot(a.x - b.x, a.y - b.y) < MEET_DISTANCE) {
           this.judging = true;
           this.ctx.waitUntil(this.encounter(a, b).finally(() => (this.judging = false)));
+
           return;
         }
       }
@@ -239,7 +266,9 @@ export class World extends DurableObject<Env> {
 
   async forceEncounter(): Promise<EncounterResult> {
     const [a, b] = this.rows();
+
     if (!a || !b) return { outcome: "need two creatures", probabilities: null };
+
     return this.encounter(a, b);
   }
 
@@ -247,13 +276,16 @@ export class World extends DurableObject<Env> {
     const description = await this.env.DB.prepare("SELECT description FROM creatures WHERE id = ?")
       .bind(row.id)
       .first("description");
+
     let memory: Record<string, string> = {};
+
     try {
       const response = await this.facet(row).fetch("https://creature/state");
       memory = CreatureState.parse(await response.json()).memory;
     } catch {
       memory = {};
     }
+
     return {
       name: row.name,
       description: z.string().catch("").parse(description),
@@ -268,14 +300,18 @@ export class World extends DurableObject<Env> {
     this.ctx.storage.sql.exec("UPDATE creatures SET cooldown_until = ? WHERE id IN (?, ?)", cooldown, a.id, b.id);
     this.announce(`${a.name} meets ${b.name}`);
     let verdict: Awaited<ReturnType<typeof judgeEncounter>>;
+
     try {
       verdict = await judgeEncounter(this.env.AI, await this.fighter(a), await this.fighter(b));
     } catch (error) {
       console.error("clef judge failed", String(error));
       this.announce(`The judge did not answer for ${a.name} and ${b.name}`);
+
       return { outcome: "judge failed", probabilities: null };
     }
+
     let childId: string | null = null;
+
     if (verdict.choice === "befriend") {
       this.announce(`${a.name} and ${b.name} befriend`);
       childId = await this.breed(a, b);
@@ -284,8 +320,10 @@ export class World extends DurableObject<Env> {
       this.announce(`${winner.name} defeats ${loser.name}`);
       this.ctx.storage.sql.exec("UPDATE creatures SET energy = energy + 5 WHERE id = ?", winner.id);
       await this.fade(loser, `lost to ${winner.name}`);
+
       if (winner.energy + 5 >= 20) childId = await this.breed(winner, winner);
     }
+
     const encounter: EncounterView = {
       at: Date.now(),
       a: a.name,
@@ -297,6 +335,7 @@ export class World extends DurableObject<Env> {
         befriend: verdict.probabilities.befriend ?? 0,
       },
     };
+
     this.encounters = [...this.encounters.slice(-9), encounter];
     this.broadcast({ type: "encounter", encounter });
     await this.env.DB.prepare(
@@ -304,16 +343,19 @@ export class World extends DurableObject<Env> {
     )
       .bind(crypto.randomUUID(), a.id, b.id, verdict.choice, JSON.stringify(verdict.probabilities), childId, Date.now())
       .run();
+
     return { outcome: verdict.choice, probabilities: verdict.probabilities };
   }
 
   private async fade(row: Row, reason: string): Promise<void> {
     this.ctx.storage.sql.exec("DELETE FROM creatures WHERE id = ?", row.id);
+
     try {
       this.ctx.facets.delete(row.id);
     } catch {
       this.announce(`${row.name}'s memory lingers`);
     }
+
     await this.env.DB.prepare("UPDATE creatures SET fate = ? WHERE id = ?").bind(`faded: ${reason}`, row.id).run();
     this.announce(`${row.name} fades (${reason})`);
   }
@@ -331,6 +373,7 @@ export class World extends DurableObject<Env> {
       .run();
     this.ctx.storage.sql.exec("UPDATE creatures SET energy = energy - 3 WHERE id IN (?, ?)", a.id, b.id);
     await this.addCreature({ id, name, code, generation });
+
     return id;
   }
 }
