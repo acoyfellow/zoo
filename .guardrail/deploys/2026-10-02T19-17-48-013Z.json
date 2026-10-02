@@ -1,0 +1,42 @@
+{
+  "schema": "guardrail.deploy-receipt.v0",
+  "timestamp": "2026-10-02T19:17:48.013Z",
+  "command": [
+    "guardrail",
+    "receipt",
+    "core/.guardrail-staged.42122.wrangler.jsonc"
+  ],
+  "configPath": "core/.guardrail-staged.42122.wrangler.jsonc",
+  "decision": {
+    "allowed": true,
+    "findings": []
+  },
+  "exposure": {
+    "isPublic": false,
+    "surface": "no public surface",
+    "reason": "",
+    "criticalMessage": "",
+    "routes": [],
+    "workersDev": false
+  },
+  "bindings": [
+    {
+      "type": "ai",
+      "name": "AI"
+    },
+    {
+      "type": "d1",
+      "name": "DB"
+    },
+    {
+      "type": "durable_object_namespace",
+      "name": "WORLD"
+    }
+  ],
+  "auth": {
+    "detected": false,
+    "partial": false,
+    "patterns": [],
+    "source": "/Users/jcoeyman/cloudflare/zoo/src/worker/index.ts"
+  }
+}

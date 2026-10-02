@@ -18,7 +18,7 @@ export default {
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
     const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
     const { success } = await limiterFor(env, url.pathname).limit({ key: `${url.pathname}:${ip}` });
-    if (!success) return Response.json({ error: "slow down" }, { status: 429 });
+    if (!success) return Response.json({ error: "Too many requests. Wait one minute and try again." }, { status: 429 });
     return env.CORE.fetch(request);
   },
 } satisfies ExportedHandler<FrontEnv>;

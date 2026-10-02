@@ -58,9 +58,24 @@ export const WorldEvent = z.object({
 });
 export type WorldEvent = z.infer<typeof WorldEvent>;
 
+export const EncounterView = z.object({
+  at: z.number(),
+  a: z.string(),
+  b: z.string(),
+  outcome: z.enum(["a_wins", "b_wins", "befriend"]),
+  probabilities: z.object({ a_wins: z.number(), b_wins: z.number(), befriend: z.number() }),
+});
+export type EncounterView = z.infer<typeof EncounterView>;
+
 export const WorldMessage = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("snapshot"), creatures: z.array(CreatureView), events: z.array(WorldEvent) }),
+  z.object({
+    type: z.literal("snapshot"),
+    creatures: z.array(CreatureView),
+    events: z.array(WorldEvent),
+    encounters: z.array(EncounterView),
+  }),
   z.object({ type: z.literal("event"), event: WorldEvent }),
+  z.object({ type: z.literal("encounter"), encounter: EncounterView }),
 ]);
 export type WorldMessage = z.infer<typeof WorldMessage>;
 

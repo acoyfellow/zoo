@@ -33,20 +33,33 @@ async function trial(env: Env, code: string): Promise<TickResult> {
 
 async function spawn(request: Request, env: Env): Promise<Response> {
   const body = SpawnRequest.safeParse(await request.json().catch(() => null));
-  if (!body.success) return Response.json({ error: "describe your creature in 3-400 characters" }, { status: 400 });
+  if (!body.success) return Response.json({ error: "Write a description of 3 to 400 characters." }, { status: 400 });
   const ipHash = await hashIp(request.headers.get("CF-Connecting-IP") ?? "unknown");
   const recent = z.number().parse(
     await env.DB.prepare("SELECT COUNT(*) AS n FROM creatures WHERE ip_hash = ? AND created_at > ?")
       .bind(ipHash, Date.now() - 3600_000)
       .first("n"),
   );
-  if (recent >= MAX_PER_IP_PER_HOUR) return Response.json({ error: "hatchery limit: 10 per hour" }, { status: 429 });
+  if (recent >= MAX_PER_IP_PER_HOUR)
+    return Response.json(
+      { error: "Limit reached: 10 creatures per hour from one address. Try again later." },
+      { status: 429 },
+    );
   const stub = world(env);
-  if ((await stub.aliveCount()) >= MAX_ALIVE) return Response.json({ error: "the terrarium is full" }, { status: 429 });
+  if ((await stub.aliveCount()) >= MAX_ALIVE)
+    return Response.json(
+      { error: "The world has 200 creatures, which is the limit. Try again later." },
+      { status: 429 },
+    );
   const behavior = await writeBehavior(env.AI, body.data.description);
-  if (!behavior.ok) return Response.json({ error: `behavior rejected: ${behavior.reason}` }, { status: 422 });
+  if (!behavior.ok)
+    return Response.json(
+      { error: "The model did not write a valid behavior. Try a different description." },
+      { status: 422 },
+    );
   const result = await trial(env, behavior.code);
-  if (!result.ok) return Response.json({ error: `behavior crashed: ${result.error ?? "unknown"}` }, { status: 422 });
+  if (!result.ok)
+    return Response.json({ error: "The behavior failed its trial run. Try a different description." }, { status: 422 });
   const id = crypto.randomUUID();
   const name = nameFrom(body.data.description);
   await env.DB.prepare(
@@ -60,7 +73,7 @@ async function spawn(request: Request, env: Env): Promise<Response> {
 
 async function lineage(env: Env): Promise<Response> {
   const creatures = await env.DB.prepare(
-    "SELECT id, name, description, model, parent_a, parent_b, fate, created_at, code FROM creatures ORDER BY created_at DESC LIMIT 50",
+    "SELECT id, name, description, model, parent_a, parent_b, fate, created_at FROM creatures ORDER BY created_at DESC LIMIT 50",
   ).all();
   const encounters = await env.DB.prepare("SELECT * FROM encounters ORDER BY created_at DESC LIMIT 50").all();
   return Response.json({ creatures: creatures.results, encounters: encounters.results });
@@ -75,6 +88,6 @@ export default {
     if (url.pathname === "/api/encounter" && request.method === "POST") {
       return Response.json(await world(env).forceEncounter());
     }
-    return Response.json({ error: "not found" }, { status: 404 });
+    return Response.json({ error: "Not found." }, { status: 404 });
   },
 } satisfies ExportedHandler<Env>;

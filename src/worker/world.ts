@@ -3,16 +3,18 @@ export type EncounterResult = { outcome: string; probabilities: Record<string, n
 import { DurableObject } from "cloudflare:workers";
 import { z } from "zod";
 import { type Fighter, judgeEncounter } from "./ai";
-import { applyMove, creatureModule, hueFor, mergeBehaviors, WORLD_SIZE } from "./behavior";
+import { applyMove, clampToWorld, creatureModule, EDGE_MARGIN, hueFor, mergeBehaviors, WORLD_SIZE } from "./behavior";
 import {
   CreatureState,
   type CreatureView,
+  type EncounterView,
   type NewCreature,
   NewCreature as NewCreatureSchema,
   TickResult,
   type WorldEvent,
   type WorldMessage,
 } from "./schema";
+import { STARTER_COUNT, STARTERS } from "./starters";
 
 const TICK_MS = 1500;
 const MEET_DISTANCE = 24;
@@ -35,6 +37,7 @@ export class World extends DurableObject<Env> {
   private tickCount = 0;
   private judging = false;
   private events: WorldEvent[] = [];
+  private encounters: EncounterView[] = [];
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -53,12 +56,13 @@ export class World extends DurableObject<Env> {
   }
 
   private view(row: Row): CreatureView {
+    const position = clampToWorld(row.x, row.y);
     return {
       id: row.id,
       name: row.name,
       hue: hueFor(row.id),
-      x: row.x,
-      y: row.y,
+      x: position.x,
+      y: position.y,
       energy: row.energy,
       said: row.said,
       generation: row.generation,
@@ -98,7 +102,7 @@ export class World extends DurableObject<Env> {
     if ((await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(Date.now() + TICK_MS);
   }
 
-  async addCreature(input: NewCreature): Promise<{ alive: number }> {
+  async addCreature(input: NewCreature, near?: { x: number; y: number }): Promise<{ alive: number }> {
     const creature = NewCreatureSchema.parse(input);
     const alive = this.rows().length;
     if (alive >= MAX_ALIVE) throw new Error("world is full");
@@ -107,8 +111,8 @@ export class World extends DurableObject<Env> {
       creature.id,
       creature.name,
       creature.code,
-      Math.random() * WORLD_SIZE,
-      Math.random() * WORLD_SIZE,
+      near ? clampToWorld(near.x, near.y).x : EDGE_MARGIN + Math.random() * (WORLD_SIZE - 2 * EDGE_MARGIN),
+      near ? clampToWorld(near.x, near.y).y : EDGE_MARGIN + Math.random() * (WORLD_SIZE - 2 * EDGE_MARGIN),
       10,
       creature.generation,
     );
@@ -117,16 +121,36 @@ export class World extends DurableObject<Env> {
     return { alive: alive + 1 };
   }
 
+  private async topUpStarters(): Promise<void> {
+    const missing = STARTER_COUNT - this.rows().length;
+    for (const starter of STARTERS.slice(0, Math.max(0, missing))) {
+      const id = crypto.randomUUID();
+      await this.env.DB.prepare(
+        "INSERT INTO creatures (id, name, description, code, model, ip_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      )
+        .bind(id, starter.name, starter.description, starter.code, "starter", "starter", Date.now())
+        .run();
+      const near = { x: WORLD_SIZE / 2 + (Math.random() - 0.5) * 160, y: WORLD_SIZE / 2 + (Math.random() - 0.5) * 160 };
+      await this.addCreature({ id, name: starter.name, code: starter.code, generation: 0 }, near);
+    }
+  }
+
   async aliveCount(): Promise<number> {
     return this.rows().length;
   }
 
   override async fetch(request: Request): Promise<Response> {
     if (request.headers.get("Upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });
+    await this.topUpStarters();
     const pair = new WebSocketPair();
     this.ctx.acceptWebSocket(pair[1]);
     pair[1].send(
-      JSON.stringify({ type: "snapshot", creatures: this.rows().map((r) => this.view(r)), events: this.events }),
+      JSON.stringify({
+        type: "snapshot",
+        creatures: this.rows().map((r) => this.view(r)),
+        events: this.events,
+        encounters: this.encounters,
+      }),
     );
     await this.ensureAlarm();
     return new Response(null, { status: 101, webSocket: pair[0] });
@@ -191,7 +215,8 @@ export class World extends DurableObject<Env> {
     await Promise.all(before.map((row) => this.stepCreature(row, before)));
     const after = this.rows();
     for (const row of after.filter((r) => r.energy <= 0)) await this.fade(row, "ran out of energy");
-    this.broadcast({ type: "snapshot", creatures: this.rows().map((r) => this.view(r)), events: [] });
+    if (this.ctx.getWebSockets().length > 0) await this.topUpStarters();
+    this.broadcast({ type: "snapshot", creatures: this.rows().map((r) => this.view(r)), events: [], encounters: [] });
     this.findEncounter(this.rows());
     if (this.rows().length > 0 || this.ctx.getWebSockets().length > 0)
       await this.ctx.storage.setAlarm(Date.now() + TICK_MS);
@@ -241,12 +266,13 @@ export class World extends DurableObject<Env> {
   private async encounter(a: Row, b: Row): Promise<EncounterResult> {
     const cooldown = Date.now() + 20000;
     this.ctx.storage.sql.exec("UPDATE creatures SET cooldown_until = ? WHERE id IN (?, ?)", cooldown, a.id, b.id);
-    this.announce(`${a.name} meets ${b.name}…`);
+    this.announce(`${a.name} meets ${b.name}`);
     let verdict: Awaited<ReturnType<typeof judgeEncounter>>;
     try {
       verdict = await judgeEncounter(this.env.AI, await this.fighter(a), await this.fighter(b));
     } catch (error) {
-      this.announce(`the judge was silent (${String(error).slice(0, 60)})`);
+      console.error("clef judge failed", String(error));
+      this.announce(`The judge did not answer for ${a.name} and ${b.name}`);
       return { outcome: "judge failed", probabilities: null };
     }
     let childId: string | null = null;
@@ -260,6 +286,19 @@ export class World extends DurableObject<Env> {
       await this.fade(loser, `lost to ${winner.name}`);
       if (winner.energy + 5 >= 20) childId = await this.breed(winner, winner);
     }
+    const encounter: EncounterView = {
+      at: Date.now(),
+      a: a.name,
+      b: b.name,
+      outcome: verdict.choice,
+      probabilities: {
+        a_wins: verdict.probabilities.a_wins ?? 0,
+        b_wins: verdict.probabilities.b_wins ?? 0,
+        befriend: verdict.probabilities.befriend ?? 0,
+      },
+    };
+    this.encounters = [...this.encounters.slice(-9), encounter];
+    this.broadcast({ type: "encounter", encounter });
     await this.env.DB.prepare(
       "INSERT INTO encounters (id, a_id, b_id, outcome, probabilities, child_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
     )

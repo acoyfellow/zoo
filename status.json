@@ -3,5 +3,6 @@
   "url": "https://zoo.coey.dev",
   "facets": true,
   "architecture": "front zoo (assets, ratelimits, service binding) -> core zoo-core (AI, D1, DO, Loader), core has no public URL",
-  "receipts": ["receipts/001-first-deploy.json", "receipts/002-coey-dev.json"]
+  "receipts": ["receipts/001-first-deploy.json", "receipts/002-coey-dev.json", "receipts/003-marketing-pass.json"],
+  "summary": "Live at https://zoo.coey.dev. Four starter creatures, clamped positions, encounters with Clef probabilities and a lineage list on the page."
 }

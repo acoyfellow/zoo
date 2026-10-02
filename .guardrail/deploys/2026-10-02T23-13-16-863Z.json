@@ -1,0 +1,52 @@
+{
+  "schema": "guardrail.deploy-receipt.v0",
+  "timestamp": "2026-10-02T23:13:16.863Z",
+  "command": [
+    "wrangler",
+    "deploy",
+    "-c",
+    "core/wrangler.jsonc"
+  ],
+  "configPath": "/Users/jcoeyman/cloudflare/zoo/wrangler.jsonc",
+  "git": {
+    "sha": "053d8e64bc4be9a33c0bf0b6184bd7784ad48a96",
+    "dirty": true
+  },
+  "decision": {
+    "allowed": true,
+    "findings": [
+      {
+        "severity": "WARNING",
+        "message": "Worker is attached to custom route zoo.coey.dev with sensitive bindings"
+      },
+      {
+        "severity": "WARNING",
+        "message": "service binding \"CORE\" exposed on custom route zoo.coey.dev"
+      }
+    ]
+  },
+  "exposure": {
+    "isPublic": true,
+    "surface": "custom route zoo.coey.dev",
+    "reason": "custom route zoo.coey.dev",
+    "criticalMessage": "Worker is attached to custom route zoo.coey.dev with sensitive bindings",
+    "routes": [
+      "zoo.coey.dev"
+    ],
+    "workersDev": false
+  },
+  "bindings": [
+    {
+      "type": "service",
+      "name": "CORE"
+    }
+  ],
+  "auth": {
+    "detected": false,
+    "partial": false,
+    "patterns": [
+      "rate-limiter"
+    ],
+    "source": "/Users/jcoeyman/cloudflare/zoo/src/front/index.ts"
+  }
+}

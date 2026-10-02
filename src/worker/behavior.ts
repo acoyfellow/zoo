@@ -136,12 +136,20 @@ export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+export const EDGE_MARGIN = 40;
+
+export function clampToWorld(x: number, y: number): { x: number; y: number } {
+  const safeX = Number.isFinite(x) ? x : WORLD_SIZE / 2;
+  const safeY = Number.isFinite(y) ? y : WORLD_SIZE / 2;
+  return {
+    x: clamp(safeX, EDGE_MARGIN, WORLD_SIZE - EDGE_MARGIN),
+    y: clamp(safeY, EDGE_MARGIN, WORLD_SIZE - EDGE_MARGIN),
+  };
+}
+
 export function applyMove(x: number, y: number, dx: number, dy: number): { x: number; y: number } {
   const step = 12;
-  return {
-    x: clamp(x + clamp(dx, -step, step), 0, WORLD_SIZE),
-    y: clamp(y + clamp(dy, -step, step), 0, WORLD_SIZE),
-  };
+  return clampToWorld(x + clamp(dx, -step, step), y + clamp(dy, -step, step));
 }
 
 export function hueFor(id: string): number {

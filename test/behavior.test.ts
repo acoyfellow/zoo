@@ -1,6 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { applyMove, extractCode, mergeBehaviors, nameFrom, validateBehavior } from "../src/worker/behavior";
+import {
+  applyMove,
+  clampToWorld,
+  EDGE_MARGIN,
+  extractCode,
+  mergeBehaviors,
+  nameFrom,
+  validateBehavior,
+} from "../src/worker/behavior";
 import { ClefOutput, TickResult } from "../src/worker/schema";
+import { STARTERS } from "../src/worker/starters";
 
 const good = `export default function behave(api, view) {
   api.move(view.tick % 2 ? 5 : -5, 3);
@@ -44,11 +53,23 @@ describe("mergeBehaviors", () => {
 
 describe("world math", () => {
   test("moves are clamped", () => {
-    expect(applyMove(0, 790, -100, 100)).toEqual({ x: 0, y: 800 });
+    expect(applyMove(0, 790, -100, 100)).toEqual({ x: EDGE_MARGIN, y: 800 - EDGE_MARGIN });
     expect(applyMove(100, 100, 100, 0)).toEqual({ x: 112, y: 100 });
+  });
+  test("clampToWorld keeps creatures inside the edge margin", () => {
+    expect(clampToWorld(-50, 9000)).toEqual({ x: EDGE_MARGIN, y: 800 - EDGE_MARGIN });
+    expect(clampToWorld(Number.NaN, 400)).toEqual({ x: 400, y: 400 });
   });
   test("names come from description", () => {
     expect(nameFrom("a shy blue moth")).toBe("Moth");
+  });
+});
+
+describe("starter creatures", () => {
+  test("every starter passes the validator and has a distinct behavior", () => {
+    expect(STARTERS.length).toBe(4);
+    for (const starter of STARTERS) expect(validateBehavior(starter.code)).toEqual({ ok: true, code: starter.code });
+    expect(new Set(STARTERS.map((s) => s.code)).size).toBe(4);
   });
 });
 

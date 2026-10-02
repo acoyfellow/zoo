@@ -1,0 +1,24 @@
+{
+  "url": "https://zoo.coey.dev/",
+  "before": { "title": "Facet Zoo", "description": null },
+  "after": {
+    "title": "Facet Zoo: creatures that run model-written code",
+    "description": "Describe a creature in one sentence. A model writes its behavior code, a sandbox runs it, and the Clef model judges each meeting."
+  },
+  "deploy": { "core": "zoo-core c29b70d2-163d-4729-8bb5-45a68abfa693", "front": "zoo 5d76e4e1-3da8-4894-9c5b-59c70261ee93" },
+  "live": {
+    "/": "200 text/html, contains og:image and rel=canonical",
+    "/og.jpg": "200 image/jpeg, 1200x630, 108829 bytes",
+    "/robots.txt": "200 text/plain",
+    "/sitemap.xml": "200 application/xml",
+    "/favicon.svg": "200 image/svg+xml"
+  },
+  "endToEnd": {
+    "method": "WebSocket wss://zoo.coey.dev/api/world",
+    "firstSnapshotCreatures": 5,
+    "encounterAfterMs": 9572,
+    "encounter": { "a": "Shadow", "b": "Seeker", "outcome": "befriend", "probabilities": { "a_wins": 0.0326, "b_wins": 0.1736, "befriend": 0.7938 } }
+  },
+  "verify": "bun run verify: copy-check 13 files clean, tsc, svelte-check 0 errors 0 warnings, biome, 13 pass 0 fail",
+  "guardrailLint": "no CRITICAL; zoo has 2 warnings: custom route with sensitive bindings, service binding CORE on custom route"
+}
