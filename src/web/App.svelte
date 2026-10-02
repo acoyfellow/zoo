@@ -234,7 +234,7 @@ onMount(() => {
       <button
         type="submit"
         disabled={busy || description.trim().length < 3}
-        class="rounded-xl bg-emerald-500/20 border border-emerald-500 py-2 hover:bg-emerald-500/40 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
+        class="rounded-xl bg-emerald-500/20 border border-emerald-500 min-h-11 py-2 hover:bg-emerald-500/40 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
       >
         {busy ? "Hatching" : "Hatch creature"}
       </button>
@@ -246,7 +246,7 @@ onMount(() => {
     </form>
     {#if lastCode}
       <details class="rounded-xl bg-emerald-950/30 p-2">
-        <summary class="cursor-pointer text-xs text-emerald-300 focus-visible:outline-2 focus-visible:outline-emerald-300">Code the model wrote</summary>
+        <summary class="min-h-11 flex items-center cursor-pointer text-xs text-emerald-300 focus-visible:outline-2 focus-visible:outline-emerald-300">Code the model wrote</summary>
         <pre class="mt-2 text-[10px] max-h-48 overflow-auto text-emerald-300">{lastCode}</pre>
       </details>
     {/if}

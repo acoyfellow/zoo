@@ -22,13 +22,13 @@
   },
   "scripts": {
     "build": "vite build",
-    "types": "wrangler types -c core/wrangler.jsonc",
+    "types": "wrangler types -c core/wrangler.prod.jsonc",
     "check": "bun run types && tsc -p tsconfig.json && svelte-check --tsconfig ./tsconfig.web.json --fail-on-warnings",
     "lint": "git submodule update --init --quiet tools/anti-slop && biome check . && oxlint",
     "format": "biome check --write .",
     "test": "bun test ./test",
     "copy-check": "bun scripts/copy-check.ts",
     "verify": "bun run check && bun run lint && bun run copy-check && bun run test",
-    "deploy": "bun run build && wrangler deploy -c core/wrangler.jsonc && wrangler deploy"
+    "deploy:prod": "bun run build && wrangler deploy -c core/wrangler.prod.jsonc && wrangler d1 migrations apply zoo-lineage --remote -c core/wrangler.prod.jsonc && wrangler deploy"
   }
 }
