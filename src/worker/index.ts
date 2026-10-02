@@ -1,0 +1,80 @@
+import { z } from "zod";
+import { CODE_MODEL, writeBehavior } from "./ai";
+import { nameFrom, trialModule } from "./behavior";
+import { SpawnRequest, TickResult } from "./schema";
+
+export { World } from "./world";
+
+const MAX_PER_IP_PER_HOUR = 10;
+const MAX_ALIVE = 200;
+
+function world(env: Env) {
+  return env.WORLD.getByName("terrarium");
+}
+
+async function hashIp(ip: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`zoo:${ip}`));
+  return [...new Uint8Array(digest)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, 32);
+}
+
+async function trial(env: Env, code: string): Promise<TickResult> {
+  const worker = env.LOADER.load({
+    compatibilityDate: "2026-09-04",
+    mainModule: "trial.js",
+    modules: { "trial.js": trialModule(code) },
+    globalOutbound: null,
+  });
+  const response = await worker.getEntrypoint().fetch("https://trial/");
+  return TickResult.parse(await response.json());
+}
+
+async function spawn(request: Request, env: Env): Promise<Response> {
+  const body = SpawnRequest.safeParse(await request.json().catch(() => null));
+  if (!body.success) return Response.json({ error: "describe your creature in 3-400 characters" }, { status: 400 });
+  const ipHash = await hashIp(request.headers.get("CF-Connecting-IP") ?? "unknown");
+  const recent = z.number().parse(
+    await env.DB.prepare("SELECT COUNT(*) AS n FROM creatures WHERE ip_hash = ? AND created_at > ?")
+      .bind(ipHash, Date.now() - 3600_000)
+      .first("n"),
+  );
+  if (recent >= MAX_PER_IP_PER_HOUR) return Response.json({ error: "hatchery limit: 10 per hour" }, { status: 429 });
+  const stub = world(env);
+  if ((await stub.aliveCount()) >= MAX_ALIVE) return Response.json({ error: "the terrarium is full" }, { status: 429 });
+  const behavior = await writeBehavior(env.AI, body.data.description);
+  if (!behavior.ok) return Response.json({ error: `behavior rejected: ${behavior.reason}` }, { status: 422 });
+  const result = await trial(env, behavior.code);
+  if (!result.ok) return Response.json({ error: `behavior crashed: ${result.error ?? "unknown"}` }, { status: 422 });
+  const id = crypto.randomUUID();
+  const name = nameFrom(body.data.description);
+  await env.DB.prepare(
+    "INSERT INTO creatures (id, name, description, code, model, ip_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  )
+    .bind(id, name, body.data.description, behavior.code, CODE_MODEL, ipHash, Date.now())
+    .run();
+  await stub.addCreature({ id, name, code: behavior.code, generation: 0 });
+  return Response.json({ id, name, code: behavior.code });
+}
+
+async function lineage(env: Env): Promise<Response> {
+  const creatures = await env.DB.prepare(
+    "SELECT id, name, description, model, parent_a, parent_b, fate, created_at, code FROM creatures ORDER BY created_at DESC LIMIT 50",
+  ).all();
+  const encounters = await env.DB.prepare("SELECT * FROM encounters ORDER BY created_at DESC LIMIT 50").all();
+  return Response.json({ creatures: creatures.results, encounters: encounters.results });
+}
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+    if (url.pathname === "/api/world") return world(env).fetch(request);
+    if (url.pathname === "/api/creatures" && request.method === "POST") return spawn(request, env);
+    if (url.pathname === "/api/lineage") return lineage(env);
+    if (url.pathname === "/api/encounter" && request.method === "POST") {
+      return Response.json(await world(env).forceEncounter());
+    }
+    return Response.json({ error: "not found" }, { status: 404 });
+  },
+} satisfies ExportedHandler<Env>;

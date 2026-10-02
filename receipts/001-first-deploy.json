@@ -1,0 +1,60 @@
+{
+  "deployedUrl": "https://zoo.coy.workers.dev",
+  "rootStatus": 200,
+  "account": "bfcb6ac5b3ceaf42a09607f6f7925823",
+  "facetsAvailable": true,
+  "codeModel": "@cf/moonshotai/kimi-k2.7-code",
+  "judgeModel": "@cf/cloudflare/clef",
+  "aiGateway": "default",
+  "creatures": [
+    {
+      "id": "d13878b2-d790-4b25-925d-e2063aef1e9b",
+      "name": "Cries",
+      "code": "export default function behave(api, view) {\n  const target = view.neighbors[0];\n  if (target) {\n    const dx = target.dx > 0 ? Math.min(12, target.dx) : Math.max(-12, target.dx);\n    const dy = target.dy > 0 ? Math.min(12, target.dy) : Math.max(-12, target.dy);\n    api.move(dx, dy);\n  }\n  const cries = [\"CHARGE!\", \"For glory!\", \"Taste my spark!\", \"You cannot escape!\", \"Red fury!\"];\n  if (view.tick % 15 === 0 || (target && target.distance < 40)) {\n    api.say(cries[Math.floor(Math.random() * cries.length)]);\n  }\n}"
+    },
+    {
+      "id": "79cb7b78-1398-439f-94c7-9c4b2ab6ee78",
+      "name": "Meets",
+      "code": "export default function behave(api, view) {\n  let friends = api.recall(\"friends\") || \"\";\n  let fx = 0, fy = 0;\n  let count = 0;\n  for (let n of view.neighbors) {\n    if (!friends.includes(n.name)) {\n      friends = friends ? friends + \",\" + n.name : n.name;\n      api.say(\"Hello, \" + n.name + \"!\");\n    }\n    fx += n.dx;\n    fy += n.dy;\n    count++;\n  }\n  api.remember(\"friends\", friends);\n  let t = view.tick * 0.03;\n  let driftX = Math.sin(t) * 1.5;\n  let driftY = Math.cos(t * 0.6) * 1.5;\n  if (count > 0) {\n    fx /= count;\n    fy /= count;\n    let len = Math.sqrt(fx * fx + fy * fy) || 1;\n    api.move((fx / len) * 3 + driftX, (fy / len) * 3 + driftY);\n  } else {\n    api.move(driftX, driftY);\n  }\n}"
+    }
+  ],
+  "encounter": {
+    "id": "f0a4b6a8-7e67-4250-875a-9b368d7fe671",
+    "a_id": "d13878b2-d790-4b25-925d-e2063aef1e9b",
+    "b_id": "79cb7b78-1398-439f-94c7-9c4b2ab6ee78",
+    "outcome": "befriend",
+    "probabilities": "{\"a_wins\":0.4226,\"b_wins\":0.137,\"befriend\":0.4404}",
+    "child_id": "58f0c8e2-331d-41bb-bac5-8ccb7137a4a6",
+    "created_at": 1790965342283
+  },
+  "lineage": [
+    {
+      "id": "58f0c8e2-331d-41bb-bac5-8ccb7137a4a6",
+      "name": "Crieets",
+      "description": "offspring of Cries and Meets",
+      "model": "merge",
+      "parent_a": "d13878b2-d790-4b25-925d-e2063aef1e9b",
+      "parent_b": "79cb7b78-1398-439f-94c7-9c4b2ab6ee78",
+      "fate": "alive"
+    },
+    {
+      "id": "79cb7b78-1398-439f-94c7-9c4b2ab6ee78",
+      "name": "Meets",
+      "description": "a gentle teal jellyfish that drifts toward others and remembers every friend it meets",
+      "model": "@cf/moonshotai/kimi-k2.7-code",
+      "parent_a": null,
+      "parent_b": null,
+      "fate": "alive"
+    },
+    {
+      "id": "d13878b2-d790-4b25-925d-e2063aef1e9b",
+      "name": "Cries",
+      "description": "a fierce red spark beetle that charges at the nearest neighbor and shouts battle cries",
+      "model": "@cf/moonshotai/kimi-k2.7-code",
+      "parent_a": null,
+      "parent_b": null,
+      "fate": "alive"
+    }
+  ],
+  "verify": "bun run verify: tsc + svelte-check 0 errors, biome clean, 11 tests pass"
+}

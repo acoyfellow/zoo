@@ -1,0 +1,79 @@
+import { z } from "zod";
+
+export const SpawnRequest = z.object({
+  description: z.string().trim().min(3).max(400),
+});
+
+export const ActionSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("move"), dx: z.number().finite(), dy: z.number().finite() }),
+  z.object({ type: z.literal("say"), text: z.string().max(80) }),
+  z.object({ type: z.literal("remember"), key: z.string().max(40), value: z.string().max(200) }),
+]);
+export type Action = z.infer<typeof ActionSchema>;
+
+export const TickResult = z.object({
+  ok: z.boolean(),
+  actions: z.array(ActionSchema).max(20),
+  error: z.string().optional(),
+});
+export type TickResult = z.infer<typeof TickResult>;
+
+export const CreatureState = z.object({
+  memory: z.record(z.string(), z.string()),
+});
+
+export const ModelOutput = z.union([
+  z.object({ response: z.string() }),
+  z.object({
+    choices: z.array(z.object({ message: z.object({ content: z.string().nullable() }) })).min(1),
+  }),
+]);
+
+export const ClefOutput = z.object({
+  answers: z.object({
+    outcome: z.object({
+      choice: z.enum(["a_wins", "b_wins", "befriend"]),
+      probabilities: z.record(z.string(), z.number()),
+      confidence: z.number().optional(),
+    }),
+  }),
+});
+export type ClefOutput = z.infer<typeof ClefOutput>;
+
+export const CreatureView = z.object({
+  id: z.string(),
+  name: z.string(),
+  hue: z.number(),
+  x: z.number(),
+  y: z.number(),
+  energy: z.number(),
+  said: z.string(),
+  generation: z.number(),
+});
+export type CreatureView = z.infer<typeof CreatureView>;
+
+export const WorldEvent = z.object({
+  at: z.number(),
+  text: z.string(),
+});
+export type WorldEvent = z.infer<typeof WorldEvent>;
+
+export const WorldMessage = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("snapshot"), creatures: z.array(CreatureView), events: z.array(WorldEvent) }),
+  z.object({ type: z.literal("event"), event: WorldEvent }),
+]);
+export type WorldMessage = z.infer<typeof WorldMessage>;
+
+export const NewCreature = z.object({
+  id: z.string(),
+  name: z.string(),
+  code: z.string(),
+  generation: z.number().int(),
+});
+export type NewCreature = z.infer<typeof NewCreature>;
+
+export const SpawnResponse = z.object({
+  id: z.string(),
+  name: z.string(),
+  code: z.string(),
+});

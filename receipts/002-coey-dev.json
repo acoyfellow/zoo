@@ -1,0 +1,16 @@
+{
+  "url": "https://zoo.coey.dev",
+  "front": { "worker": "zoo", "version": "e692fc80-41b5-4fac-bbab-b9369e388c15", "bindings": ["ASSETS", "CORE", "SPAWN_LIMIT", "ENCOUNTER_LIMIT", "READ_LIMIT"] },
+  "core": { "worker": "zoo-core", "version": "07e26f2d-2570-4e74-bf37-488f6f5fd73c", "bindings": ["WORLD", "DB", "AI", "LOADER"], "routes": [] },
+  "checks": {
+    "a_guardrailLint": "2 configs checked, 1 clean; zoo: 🟡 custom route with sensitive bindings, 🟡 service binding CORE exposed on zoo.coey.dev; no 🔴",
+    "b_verify": "bun run verify: tsc + svelte-check + biome clean, 11 pass 0 fail",
+    "c_rootStatus": 200,
+    "d_endToEnd": {
+      "spawned": ["843e1dfe-3625-4fe0-b545-056194e41e2c (Nearby)", "613e27d6-afb0-4c61-ad1d-5800e4d556b6 (Everyone)"],
+      "encounter": { "outcome": "befriend", "probabilities": { "a_wins": 0.4356, "b_wins": 0.0982, "befriend": 0.4662 } }
+    },
+    "e_coreWorkersDevStatus": 404
+  },
+  "notes": "Front carries a v2 deleted_classes migration for World; old demo state dropped. Core deployed with fresh v1 migration."
+}
