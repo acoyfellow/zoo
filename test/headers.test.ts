@@ -12,8 +12,16 @@ test("front responses carry CSP, nosniff, and referrer policy", () => {
 test("CSP allows only self scripts, blob and data images, and the world socket", () => {
   const policy = contentSecurityPolicy("zoo.coey.dev");
 
-  expect(policy).toContain("script-src 'self'");
+  expect(policy).toContain("script-src 'self' https://static.cloudflareinsights.com");
   expect(policy).toContain("img-src 'self' blob: data:");
-  expect(policy).toContain("connect-src 'self' wss://zoo.coey.dev");
+  expect(policy).toContain("connect-src 'self' wss://zoo.coey.dev https://cloudflareinsights.com");
   expect(policy).not.toContain("unsafe-eval");
+});
+
+test("static asset _headers match the Worker policy", async () => {
+  const file = await Bun.file("src/web/public/_headers").text();
+
+  expect(file).toContain(`Content-Security-Policy: ${contentSecurityPolicy("zoo.coey.dev")}`);
+  expect(file).toContain("X-Content-Type-Options: nosniff");
+  expect(file).toContain("Referrer-Policy: strict-origin-when-cross-origin");
 });

@@ -1,10 +1,10 @@
 export function contentSecurityPolicy(host: string): string {
   return [
     "default-src 'self'",
-    "script-src 'self'",
+    "script-src 'self' https://static.cloudflareinsights.com",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' blob: data:",
-    `connect-src 'self' wss://${host}`,
+    `connect-src 'self' wss://${host} https://cloudflareinsights.com`,
     "worker-src 'self'",
     "manifest-src 'self'",
     "font-src 'self'",
