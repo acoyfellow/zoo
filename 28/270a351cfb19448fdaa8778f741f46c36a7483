@@ -1,0 +1,19 @@
+receipts/006-living-world.json
+  s_fc002e6ac2c2f5::t_c763f22e965200 1-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "28270a351cfb19448fdaa8778f741f46c36a7483",
+  "prompts": {},
+  "sessions": {
+    "s_fc002e6ac2c2f5": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0aab9-f490-72e1-8d73-920246e8faec",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Jordan Coeyman <coeyman@gmail.com>"
+    }
+  }
+}
