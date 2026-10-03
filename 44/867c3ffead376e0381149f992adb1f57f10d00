@@ -1,0 +1,21 @@
+src/front/headers.ts
+  s_fc002e6ac2c2f5::t_491da32c47b13e 1-26
+test/headers.test.ts
+  s_fc002e6ac2c2f5::t_082d0c72a5df7c 1-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "44867c3ffead376e0381149f992adb1f57f10d00",
+  "prompts": {},
+  "sessions": {
+    "s_fc002e6ac2c2f5": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0aab9-f490-72e1-8d73-920246e8faec",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Jordan Coeyman <coeyman@gmail.com>"
+    }
+  }
+}
