@@ -9,10 +9,7 @@ import {
   type WorldEvent,
   WorldMessage,
 } from "./messages";
-
-const WORLD = 800;
-
-const MARGIN = 40;
+import { WorldRenderer } from "./world/renderer";
 
 type Connection = "connecting" | "open" | "lost";
 
@@ -38,8 +35,14 @@ let lastCode = $state("");
 
 let canvas: HTMLCanvasElement | undefined = $state();
 
-function clampPixel(value: number): number {
-  return Math.min(WORLD - MARGIN, Math.max(MARGIN, value));
+let renderer: WorldRenderer | null = null;
+
+let soundOn = $state(false);
+
+function toggleSound(): void {
+  soundOn = !soundOn;
+
+  if (renderer) renderer.sound.enabled = soundOn;
 }
 
 function percent(value: number): string {
@@ -75,13 +78,19 @@ function connect(): void {
 
     if (data.type === "snapshot") {
       creatures = data.creatures;
+      renderer?.update(data.creatures);
 
       if (data.events.length > 0) events = data.events;
 
       if (data.encounters.length > 0) encounters = data.encounters;
     } else if (data.type === "event") {
       events = [...events.slice(-29), data.event];
+    } else if (data.type === "sprite") {
+      renderer?.setSprite(data.id, data.sprite);
+    } else if (data.type === "meeting") {
+      renderer?.meeting(data.aId, data.bId);
     } else {
+      renderer?.encounter(data.encounter);
       encounters = [...encounters.slice(-9), data.encounter];
       void loadLineage();
     }
@@ -91,40 +100,6 @@ function connect(): void {
     connection = "lost";
     setTimeout(connect, 2000);
   };
-}
-
-function draw(time: number): void {
-  const context = canvas?.getContext("2d");
-
-  if (canvas && context) {
-    const scale = canvas.width / WORLD;
-    context.fillStyle = "rgba(2, 8, 6, 0.35)";
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    context.font = `${11 * scale}px ui-monospace, monospace`;
-
-    for (const creature of creatures) {
-      const pulse = 1 + Math.sin(time / 300 + creature.hue) * 0.15;
-      const radius = (6 + Math.min(creature.energy, 20) * 0.5) * pulse * scale;
-      const x = clampPixel(creature.x) * scale;
-      const y = clampPixel(creature.y) * scale;
-      const glow = context.createRadialGradient(x, y, 0, x, y, radius * 3);
-      glow.addColorStop(0, `hsla(${creature.hue}, 100%, 70%, 0.9)`);
-      glow.addColorStop(1, `hsla(${creature.hue}, 100%, 50%, 0)`);
-      context.fillStyle = glow;
-      context.beginPath();
-      context.arc(x, y, radius * 3, 0, Math.PI * 2);
-      context.fill();
-      context.fillStyle = `hsl(${creature.hue}, 100%, 85%)`;
-      const right = x + radius + context.measureText(creature.name).width < canvas.width;
-      context.textAlign = right ? "left" : "right";
-      const labelX = right ? x + radius : x - radius;
-      context.fillText(creature.name, labelX, Math.max(12 * scale, y - radius));
-
-      if (creature.said) context.fillText(`"${creature.said}"`, labelX, y + radius + 10 * scale);
-    }
-  }
-
-  requestAnimationFrame(draw);
 }
 
 async function loadLineage(): Promise<void> {
@@ -158,7 +133,8 @@ function parentsOf(creature: LineageCreature): string {
 
 async function hatch(): Promise<void> {
   busy = true;
-  status = "The model is writing a behavior. This can take up to one minute.";
+  status =
+    "A safety check runs, then the model writes a behavior. This can take up to one minute. The sprite appears a few seconds after the creature hatches.";
 
   try {
     const response = await fetch("/api/creatures", {
@@ -187,28 +163,46 @@ async function hatch(): Promise<void> {
 }
 
 onMount(() => {
+  if (canvas) {
+    renderer = new WorldRenderer(canvas);
+    renderer.start();
+    Object.assign(window, { zooStats: () => renderer?.stats() });
+  }
+
   connect();
   void loadLineage();
-  requestAnimationFrame(draw);
+
+  return () => renderer?.stop();
 });
 </script>
 
 <div aria-hidden="true" class="pointer-events-none fixed inset-0 z-0 bg-[url(/backdrop.jpg)] bg-cover bg-center opacity-35"></div>
-<div aria-hidden="true" class="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(0,0,0,0.85)_75%)]"></div>
 <main class="relative z-10 min-h-screen overflow-x-hidden text-emerald-100 font-mono p-4 flex flex-col lg:flex-row gap-4">
   <section class="flex-1 min-w-0 flex flex-col items-center gap-2">
     <h1 class="text-2xl tracking-widest text-emerald-300 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]">FACET ZOO</h1>
     <p class="max-w-xl text-center text-sm text-emerald-200/90">
-      Write one sentence about a creature. A model writes its behavior code. The code runs in its own sandbox and moves
-      the creature in this shared world. When two creatures meet, a second model picks the result.
+      Write one sentence about a creature. Black Forest Labs FLUX.1 [schnell] draws it, Moonshot AI Kimi writes its
+      behavior code, and the code runs in its own sandbox in this shared world. When two creatures meet, Cloudflare Clef
+      picks the result. All three models run on Workers AI.
     </p>
     <canvas
       bind:this={canvas}
       width="800"
       height="800"
       aria-label={`Shared world with ${creatures.length} creatures: ${creatures.map((c) => c.name).join(", ")}`}
-      class="w-full max-w-[80vh] aspect-square rounded-3xl border border-emerald-900 bg-[radial-gradient(circle_at_center,#052e1a,#000)] shadow-[0_0_60px_rgba(16,185,129,0.25)]"
+      class="w-full max-w-[80vh] aspect-square rounded-3xl border border-emerald-900 bg-black shadow-[0_0_60px_rgba(16,185,129,0.25)] cursor-grab"
     ></canvas>
+    <div class="flex flex-wrap items-center justify-center gap-3 text-xs text-emerald-400">
+      <span>Drag to pan. Pinch or scroll to zoom. Double-tap a creature to follow it.</span>
+      <button
+        type="button"
+        onclick={toggleSound}
+        aria-pressed={soundOn}
+        class="min-h-11 rounded-xl border border-emerald-700 px-3 hover:bg-emerald-500/20 focus-visible:outline-2 focus-visible:outline-emerald-300"
+      >
+        Sound: {soundOn ? "on" : "off"}
+      </button>
+    </div>
     <p class="text-xs text-emerald-500" aria-live="polite">
       {#if connection === "connecting"}
         Connecting to the world.

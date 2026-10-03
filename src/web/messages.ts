@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+export const SpriteState = z.enum(["pending", "ready", "glyph"]);
+
+export type SpriteState = z.infer<typeof SpriteState>;
+
 export const Creature = z.object({
   id: z.string(),
   name: z.string(),
@@ -9,6 +13,7 @@ export const Creature = z.object({
   energy: z.number(),
   said: z.string(),
   generation: z.number(),
+  sprite: SpriteState.catch("pending"),
 });
 
 export type Creature = z.infer<typeof Creature>;
@@ -21,6 +26,9 @@ export const Encounter = z.object({
   at: z.number(),
   a: z.string(),
   b: z.string(),
+  aId: z.string().catch(""),
+  bId: z.string().catch(""),
+  childId: z.string().nullable().catch(null),
   outcome: z.enum(["a_wins", "b_wins", "befriend"]),
   probabilities: z.object({ a_wins: z.number(), b_wins: z.number(), befriend: z.number() }),
 });
@@ -36,6 +44,8 @@ export const WorldMessage = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("event"), event: WorldEvent }),
   z.object({ type: z.literal("encounter"), encounter: Encounter }),
+  z.object({ type: z.literal("sprite"), id: z.string(), sprite: SpriteState }),
+  z.object({ type: z.literal("meeting"), aId: z.string(), bId: z.string() }),
 ]);
 
 export const LineageCreature = z.object({

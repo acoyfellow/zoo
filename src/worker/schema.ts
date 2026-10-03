@@ -43,6 +43,8 @@ export const ClefOutput = z.object({
 
 export type ClefOutput = z.infer<typeof ClefOutput>;
 
+export const SpriteState = z.enum(["pending", "ready", "glyph"]);
+
 export const CreatureView = z.object({
   id: z.string(),
   name: z.string(),
@@ -52,6 +54,7 @@ export const CreatureView = z.object({
   energy: z.number(),
   said: z.string(),
   generation: z.number(),
+  sprite: SpriteState,
 });
 
 export type CreatureView = z.infer<typeof CreatureView>;
@@ -67,6 +70,9 @@ export const EncounterView = z.object({
   at: z.number(),
   a: z.string(),
   b: z.string(),
+  aId: z.string(),
+  bId: z.string(),
+  childId: z.string().nullable(),
   outcome: z.enum(["a_wins", "b_wins", "befriend"]),
   probabilities: z.object({ a_wins: z.number(), b_wins: z.number(), befriend: z.number() }),
 });
@@ -82,6 +88,8 @@ export const WorldMessage = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("event"), event: WorldEvent }),
   z.object({ type: z.literal("encounter"), encounter: EncounterView }),
+  z.object({ type: z.literal("sprite"), id: z.string(), sprite: SpriteState }),
+  z.object({ type: z.literal("meeting"), aId: z.string(), bId: z.string() }),
 ]);
 
 export type WorldMessage = z.infer<typeof WorldMessage>;

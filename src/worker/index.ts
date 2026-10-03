@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CODE_MODEL, writeBehavior } from "./ai";
+import { FLOOR_KEY, isSafeEnough, SAFETY_THRESHOLD, safetyScore, serveObject, smallSpriteKey, spriteKey } from "./art";
 import { nameFrom, trialModule } from "./behavior";
 import { SpawnRequest, TickResult } from "./schema";
 
@@ -59,6 +60,15 @@ async function spawn(request: Request, env: Env): Promise<Response> {
       { error: "The world has 200 creatures, which is the limit. Try again later." },
       { status: 429 },
     );
+  const safety = await safetyScore(env.AI, body.data.description).catch(() => 0);
+
+  if (!isSafeEnough(safety))
+    return Response.json(
+      {
+        error: `The safety check scored this description ${safety.toFixed(2)}. It must reach ${SAFETY_THRESHOLD} to be drawn. Try a different description.`,
+      },
+      { status: 422 },
+    );
   const behavior = await writeBehavior(env.AI, body.data.description);
 
   if (!behavior.ok)
@@ -77,9 +87,9 @@ async function spawn(request: Request, env: Env): Promise<Response> {
   )
     .bind(id, name, body.data.description, behavior.code, CODE_MODEL, ipHash, Date.now())
     .run();
-  await stub.addCreature({ id, name, code: behavior.code, generation: 0 });
+  await stub.addCreature({ id, name, code: behavior.code, generation: 0 }, body.data.description);
 
-  return Response.json({ id, name, code: behavior.code });
+  return Response.json({ id, name, code: behavior.code, safety });
 }
 
 async function lineage(env: Env): Promise<Response> {
@@ -101,6 +111,16 @@ export default {
     if (url.pathname === "/api/creatures" && request.method === "POST") return spawn(request, env);
 
     if (url.pathname === "/api/lineage") return lineage(env);
+
+    if (url.pathname === "/api/floor") return serveObject(env, [FLOOR_KEY]);
+    const sprite = url.pathname.match(/^\/api\/sprite\/([0-9a-f-]{36})$/);
+
+    if (sprite?.[1]) {
+      const id = sprite[1];
+      const keys = url.searchParams.get("size") === "full" ? [spriteKey(id)] : [smallSpriteKey(id), spriteKey(id)];
+
+      return serveObject(env, keys);
+    }
 
     if (url.pathname === "/api/encounter" && request.method === "POST") {
       return Response.json(await world(env).forceEncounter());

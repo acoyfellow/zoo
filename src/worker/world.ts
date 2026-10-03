@@ -3,6 +3,7 @@ export type EncounterResult = { outcome: string; probabilities: Record<string, n
 import { DurableObject } from "cloudflare:workers";
 import { z } from "zod";
 import { type Fighter, judgeEncounter } from "./ai";
+import { mergedDescription, paintSprite } from "./art";
 import { applyMove, clampToWorld, creatureModule, EDGE_MARGIN, hueFor, mergeBehaviors, WORLD_SIZE } from "./behavior";
 import {
   CreatureState,
@@ -10,6 +11,7 @@ import {
   type EncounterView,
   type NewCreature,
   NewCreature as NewCreatureSchema,
+  SpriteState,
   TickResult,
   type WorldEvent,
   type WorldMessage,
@@ -32,6 +34,7 @@ const Row = z.object({
   said: z.string(),
   generation: z.number(),
   cooldown_until: z.number(),
+  sprite: SpriteState,
 });
 
 type Row = z.infer<typeof Row>;
@@ -49,6 +52,10 @@ export class World extends DurableObject<Env> {
       x REAL NOT NULL, y REAL NOT NULL, energy REAL NOT NULL,
       said TEXT NOT NULL DEFAULT '', generation INTEGER NOT NULL DEFAULT 0,
       cooldown_until INTEGER NOT NULL DEFAULT 0)`);
+    const columns = ctx.storage.sql.exec("PRAGMA table_info(creatures)").toArray();
+
+    if (!columns.some((column) => column.name === "sprite"))
+      ctx.storage.sql.exec("ALTER TABLE creatures ADD COLUMN sprite TEXT NOT NULL DEFAULT 'glyph'");
   }
 
   private rows(): Row[] {
@@ -70,6 +77,7 @@ export class World extends DurableObject<Env> {
       energy: row.energy,
       said: row.said,
       generation: row.generation,
+      sprite: row.sprite,
     };
   }
 
@@ -108,13 +116,26 @@ export class World extends DurableObject<Env> {
     if ((await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(Date.now() + TICK_MS);
   }
 
-  async addCreature(input: NewCreature, near?: { x: number; y: number }): Promise<{ alive: number }> {
+  private async paint(id: string, description: string): Promise<void> {
+    const result = await paintSprite(this.env, id, description);
+    const state = result.ok ? "ready" : "glyph";
+
+    if (!result.ok) console.error("sprite failed", id, result.reason);
+    this.ctx.storage.sql.exec("UPDATE creatures SET sprite = ? WHERE id = ?", state, id);
+    this.broadcast({ type: "sprite", id, sprite: state });
+  }
+
+  async addCreature(
+    input: NewCreature,
+    description: string,
+    near?: { x: number; y: number },
+  ): Promise<{ alive: number }> {
     const creature = NewCreatureSchema.parse(input);
     const alive = this.rows().length;
 
     if (alive >= MAX_ALIVE) throw new Error("world is full");
     this.ctx.storage.sql.exec(
-      "INSERT INTO creatures (id, name, code, x, y, energy, generation) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO creatures (id, name, code, x, y, energy, generation, sprite) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')",
       creature.id,
       creature.name,
       creature.code,
@@ -124,6 +145,7 @@ export class World extends DurableObject<Env> {
       creature.generation,
     );
     this.announce(`${creature.name} hatched`);
+    this.ctx.waitUntil(this.paint(creature.id, description));
     await this.ensureAlarm();
 
     return { alive: alive + 1 };
@@ -140,7 +162,7 @@ export class World extends DurableObject<Env> {
         .bind(id, starter.name, starter.description, starter.code, "starter", "starter", Date.now())
         .run();
       const near = { x: WORLD_SIZE / 2 + (Math.random() - 0.5) * 160, y: WORLD_SIZE / 2 + (Math.random() - 0.5) * 160 };
-      await this.addCreature({ id, name: starter.name, code: starter.code, generation: 0 }, near);
+      await this.addCreature({ id, name: starter.name, code: starter.code, generation: 0 }, starter.description, near);
     }
   }
 
@@ -272,10 +294,16 @@ export class World extends DurableObject<Env> {
     return this.encounter(a, b);
   }
 
-  private async fighter(row: Row): Promise<Fighter> {
+  private async descriptionOf(id: string): Promise<string> {
     const description = await this.env.DB.prepare("SELECT description FROM creatures WHERE id = ?")
-      .bind(row.id)
+      .bind(id)
       .first("description");
+
+    return z.string().catch("").parse(description);
+  }
+
+  private async fighter(row: Row): Promise<Fighter> {
+    const description = await this.descriptionOf(row.id);
 
     let memory: Record<string, string> = {};
 
@@ -288,7 +316,7 @@ export class World extends DurableObject<Env> {
 
     return {
       name: row.name,
-      description: z.string().catch("").parse(description),
+      description,
       energy: row.energy,
       memory,
       code: row.code,
@@ -299,6 +327,7 @@ export class World extends DurableObject<Env> {
     const cooldown = Date.now() + 20000;
     this.ctx.storage.sql.exec("UPDATE creatures SET cooldown_until = ? WHERE id IN (?, ?)", cooldown, a.id, b.id);
     this.announce(`${a.name} meets ${b.name}`);
+    this.broadcast({ type: "meeting", aId: a.id, bId: b.id });
     let verdict: Awaited<ReturnType<typeof judgeEncounter>>;
 
     try {
@@ -328,6 +357,9 @@ export class World extends DurableObject<Env> {
       at: Date.now(),
       a: a.name,
       b: b.name,
+      aId: a.id,
+      bId: b.id,
+      childId,
       outcome: verdict.choice,
       probabilities: {
         a_wins: verdict.probabilities.a_wins ?? 0,
@@ -366,13 +398,14 @@ export class World extends DurableObject<Env> {
     const code = mergeBehaviors(a.code, b.code, id.slice(0, 6));
     const name = `${a.name.slice(0, 4)}${b.name.slice(-3)}`;
     const generation = Math.max(a.generation, b.generation) + 1;
+    const description = mergedDescription(await this.descriptionOf(a.id), await this.descriptionOf(b.id));
     await this.env.DB.prepare(
       "INSERT INTO creatures (id, name, description, code, model, parent_a, parent_b, ip_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
-      .bind(id, name, `offspring of ${a.name} and ${b.name}`, code, "merge", a.id, b.id, "breed", Date.now())
+      .bind(id, name, description, code, "merge", a.id, b.id, "breed", Date.now())
       .run();
     this.ctx.storage.sql.exec("UPDATE creatures SET energy = energy - 3 WHERE id IN (?, ?)", a.id, b.id);
-    await this.addCreature({ id, name, code, generation });
+    await this.addCreature({ id, name, code, generation }, description, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 
     return id;
   }

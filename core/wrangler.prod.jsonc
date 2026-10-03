@@ -6,6 +6,8 @@
   "workers_dev": false,
   "preview_urls": false,
   "ai": { "binding": "AI" },
+  "images": { "binding": "IMAGES" },
+  "r2_buckets": [{ "binding": "SPRITES", "bucket_name": "zoo-sprites" }],
   "worker_loaders": [{ "binding": "LOADER" }],
   "d1_databases": [{ "binding": "DB", "database_name": "zoo-lineage", "database_id": "62464e95-8779-4889-9d20-2ed108bf5184", "migrations_dir": "../migrations" }],
   "durable_objects": { "bindings": [{ "name": "WORLD", "class_name": "World" }] },
