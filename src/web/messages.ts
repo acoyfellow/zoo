@@ -4,6 +4,10 @@ export const SpriteState = z.enum(["pending", "ready", "glyph"]);
 
 export type SpriteState = z.infer<typeof SpriteState>;
 
+export function hasStoredSprite(state: SpriteState): boolean {
+  return state === "ready";
+}
+
 export const Creature = z.object({
   id: z.string(),
   name: z.string(),

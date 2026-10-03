@@ -1,4 +1,4 @@
-import type { Creature, Egg, Encounter } from "../messages";
+import { type Creature, type Egg, type Encounter, hasStoredSprite } from "../messages";
 import { cracks, eggHue, hatchProgress, type Speckle, STAGE_LABELS, speckles, stageLook } from "./egg";
 import {
   angleSpringStep,
@@ -351,7 +351,7 @@ export class WorldRenderer {
     const hue = body.creature.hue;
     const name = body.creature.name;
     const fallback = () => glyphArt(name, hue);
-    const load = state === "glyph" ? fallback() : loadSprite(id).then((art) => art ?? fallback());
+    const load = hasStoredSprite(state) ? loadSprite(id).then((art) => art ?? fallback()) : fallback();
     void load.then((art) => {
       if (art && (!body.art || body.art.glyph)) body.art = art;
     });
