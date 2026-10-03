@@ -239,13 +239,18 @@ onMount(() => {
       behavior code, and the code runs in its own sandbox in this shared world. When two creatures meet, Cloudflare Clef
       picks the result. All three models run on Workers AI.
     </p>
-    <canvas
-      bind:this={canvas}
-      width="800"
-      height="800"
-      aria-label={`Shared world with ${creatures.length} creatures: ${creatures.map((c) => c.name).join(", ")}`}
-      class="w-full max-w-[80vh] aspect-square rounded-3xl border border-emerald-900 bg-black shadow-[0_0_60px_rgba(16,185,129,0.25)] cursor-grab"
-    ></canvas>
+    <div
+      data-world-frame
+      class="relative w-full aspect-square lg:w-[min(100%,calc(100vh-13rem))] rounded-3xl ring-1 ring-emerald-900 bg-black shadow-[0_0_60px_rgba(16,185,129,0.25)] overflow-hidden"
+    >
+      <canvas
+        bind:this={canvas}
+        width="800"
+        height="800"
+        aria-label={`Shared world with ${creatures.length} creatures: ${creatures.map((c) => c.name).join(", ")}`}
+        class="absolute inset-0 block size-full cursor-grab"
+      ></canvas>
+    </div>
     <div class="flex flex-wrap items-center justify-center gap-3 text-xs text-emerald-400">
       <span>Drag to pan. Pinch or scroll to zoom. Double-tap a creature to follow it.</span>
       <button

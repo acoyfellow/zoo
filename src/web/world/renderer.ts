@@ -116,6 +116,7 @@ export class WorldRenderer {
   private running = false;
   private readonly reducedMotion: boolean;
   private readonly dust: Vec[];
+  private readonly sizeObserver = new ResizeObserver(() => this.resize());
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const context = canvas.getContext("2d");
@@ -136,11 +137,13 @@ export class WorldRenderer {
 
   start(): void {
     this.running = true;
+    this.sizeObserver.observe(this.canvas);
     requestAnimationFrame((time) => this.frame(time));
   }
 
   stop(): void {
     this.running = false;
+    this.sizeObserver.disconnect();
   }
 
   stats(): FrameStats {
