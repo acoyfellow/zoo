@@ -40,6 +40,40 @@ export function keyOutBlack(data: Uint8ClampedArray): void {
   }
 }
 
+interface OpaqueBox {
+  centerX: number;
+  centerY: number;
+  width: number;
+  height: number;
+}
+
+export function opaqueBox(data: Uint8ClampedArray, size: number): OpaqueBox {
+  let left = size;
+  let top = size;
+  let right = 0;
+  let bottom = 0;
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if ((data[(y * size + x) * 4 + 3] ?? 0) < 60) continue;
+      left = Math.min(left, x);
+      right = Math.max(right, x);
+      top = Math.min(top, y);
+      bottom = Math.max(bottom, y);
+    }
+  }
+
+  if (right <= left || bottom <= top) return { centerX: size / 2, centerY: size / 2, width: size, height: size };
+  const pad = 6;
+
+  return {
+    centerX: (left + right) / 2,
+    centerY: (top + bottom) / 2,
+    width: Math.min(size, right - left + pad * 2),
+    height: Math.min(size, bottom - top + pad * 2),
+  };
+}
+
 async function transparentFrom(source: ImageBitmap): Promise<SpriteArt | null> {
   const canvas = new OffscreenCanvas(SIZE, SIZE);
   const context = canvas.getContext("2d", { willReadFrequently: true });
@@ -49,8 +83,15 @@ async function transparentFrom(source: ImageBitmap): Promise<SpriteArt | null> {
   const pixels = context.getImageData(0, 0, SIZE, SIZE);
   keyOutBlack(pixels.data);
   context.putImageData(pixels, 0, 0);
+  const box = opaqueBox(pixels.data, SIZE);
+  const side = Math.max(box.width, box.height);
 
-  return { bitmap: await createImageBitmap(canvas), hue: averageHue(pixels.data), glyph: false };
+  const cropped = await createImageBitmap(canvas, box.centerX - side / 2, box.centerY - side / 2, side, side, {
+    resizeWidth: SIZE,
+    resizeHeight: SIZE,
+  });
+
+  return { bitmap: cropped, hue: averageHue(pixels.data), glyph: false };
 }
 
 export async function glyphArt(name: string, hue: number): Promise<SpriteArt | null> {

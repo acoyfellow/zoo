@@ -67,12 +67,36 @@ export type Fighter = {
   code: string;
 };
 
-export async function judgeEncounter(ai: Ai, a: Fighter, b: Fighter): Promise<ClefOutput["answers"]["outcome"]> {
+export const FIGHTER_LIMITS = { description: 300, code: 1200, memoryEntries: 6, memoryValue: 80 };
+
+export function compactFighter(fighter: Fighter): Fighter {
+  const memory = Object.fromEntries(
+    Object.entries(fighter.memory)
+      .slice(0, FIGHTER_LIMITS.memoryEntries)
+      .map(([key, value]) => [key.slice(0, 40), value.slice(0, FIGHTER_LIMITS.memoryValue)]),
+  );
+
+  return {
+    name: fighter.name,
+    description: fighter.description.slice(0, FIGHTER_LIMITS.description),
+    energy: Math.round(fighter.energy * 10) / 10,
+    memory,
+    code: fighter.code.slice(0, FIGHTER_LIMITS.code),
+  };
+}
+
+export type Verdict = ClefOutput["answers"]["outcome"];
+
+export function parseVerdict(body: string): Verdict {
+  return ClefOutputSchema.parse(JSON.parse(body)).answers.outcome;
+}
+
+export async function judgeEncounter(ai: Ai, a: Fighter, b: Fighter): Promise<Verdict> {
   const output = await ai.run(
     JUDGE_MODEL,
     {
       model: "clef",
-      state: { creature_a: a, creature_b: b },
+      state: { creature_a: compactFighter(a), creature_b: compactFighter(b) },
       questions: {
         outcome: {
           type: "choice",

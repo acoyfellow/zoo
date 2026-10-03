@@ -185,3 +185,14 @@ export function nameFrom(description: string): string {
 
   return pick.slice(0, 1).toUpperCase() + pick.slice(1, 10).toLowerCase();
 }
+
+const NAME_ENDINGS = ["ix", "o", "ara", "en", "ul", "ette", "ik", "os", "ina", "ar"];
+
+export function childName(a: string, b: string, seed: string): string {
+  const left = a.slice(0, Math.max(2, Math.ceil(a.length / 2)));
+  const right = b.slice(Math.floor(b.length / 2)).toLowerCase();
+  const ending = NAME_ENDINGS[hueFor(seed) % NAME_ENDINGS.length] ?? "o";
+  const base = a === b ? `${left}${ending}` : `${left}${right}`;
+
+  return base.slice(0, 12);
+}

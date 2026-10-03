@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { CODE_MODEL, writeBehavior } from "./ai";
 import { FLOOR_KEY, isSafeEnough, SAFETY_THRESHOLD, safetyScore, serveObject, smallSpriteKey, spriteKey } from "./art";
-import { nameFrom, trialModule } from "./behavior";
-import { SpawnRequest, TickResult } from "./schema";
+import { nameFrom, trialModule, type ValidationResult } from "./behavior";
+import { type EggStage, SpawnRequest, TickResult } from "./schema";
 
 export { World } from "./world";
 
@@ -54,32 +54,42 @@ async function spawn(request: Request, env: Env): Promise<Response> {
       { status: 429 },
     );
   const stub = world(env);
+  const egg = body.data.egg;
+  const description = body.data.description;
+
+  const stage = async (next: EggStage, error?: string): Promise<void> => {
+    if (egg) await stub.incubate(egg, description, next, error ? { error } : {});
+  };
+
+  const fail = async (error: string, status: number): Promise<Response> => {
+    await stage("failed", error);
+
+    return Response.json({ error }, { status });
+  };
 
   if ((await stub.aliveCount()) >= MAX_ALIVE)
     return Response.json(
       { error: "The world has 200 creatures, which is the limit. Try again later." },
       { status: 429 },
     );
-  const safety = await safetyScore(env.AI, body.data.description).catch(() => 0);
+  await stage("safety");
+  const safety = await safetyScore(env.AI, description).catch(() => 0);
 
   if (!isSafeEnough(safety))
-    return Response.json(
-      {
-        error: `The safety check scored this description ${safety.toFixed(2)}. It must reach ${SAFETY_THRESHOLD} to be drawn. Try a different description.`,
-      },
-      { status: 422 },
+    return fail(
+      `Clef refused this description. Its safety score was ${safety.toFixed(2)} and it must reach ${SAFETY_THRESHOLD}. Try a different description.`,
+      422,
     );
-  const behavior = await writeBehavior(env.AI, body.data.description);
+  await stage("code");
 
-  if (!behavior.ok)
-    return Response.json(
-      { error: "The model did not write a valid behavior. Try a different description." },
-      { status: 422 },
-    );
-  const result = await trial(env, behavior.code);
+  const behavior = await writeBehavior(env.AI, description).catch(
+    (): ValidationResult => ({ ok: false, reason: "model error" }),
+  );
 
-  if (!result.ok)
-    return Response.json({ error: "The behavior failed its trial run. Try a different description." }, { status: 422 });
+  if (!behavior.ok) return fail("The model did not write a valid behavior. Try a different description.", 422);
+  const result = await trial(env, behavior.code).catch((): TickResult => ({ ok: false, actions: [] }));
+
+  if (!result.ok) return fail("The behavior failed its trial run. Try a different description.", 422);
   const id = crypto.randomUUID();
   const name = nameFrom(body.data.description);
   await env.DB.prepare(
@@ -87,7 +97,7 @@ async function spawn(request: Request, env: Env): Promise<Response> {
   )
     .bind(id, name, body.data.description, behavior.code, CODE_MODEL, ipHash, Date.now())
     .run();
-  await stub.addCreature({ id, name, code: behavior.code, generation: 0 }, body.data.description);
+  await stub.addCreature({ id, name, code: behavior.code, generation: 0 }, description, egg, egg);
 
   return Response.json({ id, name, code: behavior.code, safety });
 }

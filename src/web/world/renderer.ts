@@ -1,4 +1,5 @@
-import type { Creature, Encounter } from "../messages";
+import type { Creature, Egg, Encounter } from "../messages";
+import { cracks, eggHue, hatchProgress, type Speckle, STAGE_LABELS, speckles, stageLook } from "./egg";
 import {
   angleSpringStep,
   breathScale,
@@ -38,6 +39,7 @@ interface Body {
   saidAt: number;
   said: string;
   dying: number;
+  hatched: boolean;
 }
 
 interface Particle {
@@ -66,6 +68,14 @@ interface Focus {
   outcomeAt: number;
 }
 
+interface Incubation {
+  egg: Egg;
+  dots: Speckle[];
+  hue: number;
+  hatchAt: number;
+  failAt: number;
+}
+
 interface Pointer {
   x: number;
   y: number;
@@ -86,6 +96,7 @@ export class WorldRenderer {
   private readonly bodies = new Map<string, Body>();
   private particles: Particle[] = [];
   private bubbles: Bubble[] = [];
+  private readonly eggs = new Map<string, Incubation>();
   private floor: ImageBitmap | null = null;
   private fog: HTMLCanvasElement | null = null;
   private snapshotAt = 0;
@@ -210,6 +221,70 @@ export class WorldRenderer {
     this.refreshArt(body);
   }
 
+  setEgg(egg: Egg): void {
+    const now = performance.now();
+    const existing = this.eggs.get(egg.id);
+
+    const incubation: Incubation = existing ?? {
+      egg,
+      dots: speckles(egg.seed, 14),
+      hue: eggHue(egg.seed),
+      hatchAt: 0,
+      failAt: 0,
+    };
+
+    if (existing && existing.egg.seed !== egg.seed && egg.seed) {
+      incubation.dots = speckles(egg.seed, 14);
+      incubation.hue = eggHue(egg.seed);
+    }
+
+    incubation.egg = existing ? { ...egg, x: existing.egg.x, y: existing.egg.y } : egg;
+
+    if (egg.stage === "ready" && incubation.hatchAt === 0) this.hatchEgg(incubation, now);
+
+    if (egg.stage === "failed" && incubation.failAt === 0) incubation.failAt = now;
+    this.eggs.set(egg.id, incubation);
+  }
+
+  syncEggs(eggs: Egg[]): void {
+    for (const egg of eggs) this.setEgg(egg);
+  }
+
+  dropEgg(id: string): void {
+    this.eggs.delete(id);
+  }
+
+  private hatchEgg(incubation: Incubation, now: number): void {
+    incubation.hatchAt = now;
+    const count = this.reducedMotion ? 10 : 40;
+
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const speed = 40 + hashUnit(`${incubation.egg.id}${i}`, 31) * 90;
+      this.emit({
+        x: incubation.egg.x,
+        y: incubation.egg.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 1.1,
+        max: 1.1,
+        hue: incubation.hue,
+        size: 3,
+        heart: false,
+      });
+    }
+
+    const body = incubation.egg.creatureId ? this.bodies.get(incubation.egg.creatureId) : undefined;
+
+    if (body) {
+      body.bornAt = now + 250;
+      body.hatched = true;
+      body.position = { x: incubation.egg.x, y: incubation.egg.y };
+    }
+
+    this.sound.hatch();
+  }
+
   meeting(aId: string, bId: string): void {
     this.focus = { aId, bId, at: performance.now(), encounter: null, outcomeAt: 0 };
   }
@@ -257,6 +332,7 @@ export class WorldRenderer {
       saidAt: 0,
       said: creature.said,
       dying: 0,
+      hatched: false,
     };
 
     this.refreshArt(body);
@@ -455,6 +531,13 @@ export class WorldRenderer {
       ];
     });
     this.bubbles = this.bubbles.filter((bubble) => now - bubble.at < 4000);
+
+    for (const [id, incubation] of this.eggs) {
+      const ended = incubation.hatchAt || incubation.failAt;
+
+      if (ended > 0 && now - ended > (incubation.failAt ? 6000 : 1500)) this.eggs.delete(id);
+    }
+
     this.stepCamera(now, realDt);
   }
 
@@ -520,6 +603,7 @@ export class WorldRenderer {
     this.drawCreatures(context, now);
     this.drawBloom(context, now);
     this.drawParticles(context, true);
+    this.drawEggs(context, now);
     this.drawEncounterRing(context, now);
     this.drawBubbles(context, now);
     this.applyCamera(context, now, 0.6);
@@ -549,12 +633,20 @@ export class WorldRenderer {
   }
 
   private sizeOf(body: Body): number {
-    return 70 + Math.min(body.creature.energy, 20) * 1.2;
+    return 72 + Math.min(body.creature.energy, 20);
+  }
+
+  private isIncubating(id: string): boolean {
+    for (const incubation of this.eggs.values())
+      if (incubation.egg.creatureId === id && incubation.hatchAt === 0) return true;
+
+    return false;
   }
 
   private bodyScale(body: Body, now: number): number {
+    if (this.isIncubating(body.creature.id)) return 0;
     const born = clamp01((now - body.bornAt) / 700);
-    const appear = body.creature.generation > 0 ? easeOutBack(born) : easeOutCubic(born);
+    const appear = body.creature.generation > 0 || body.hatched ? easeOutBack(born) : easeOutCubic(born);
     const fade = body.dying > 0 ? 1 - clamp01((now - body.dying) / 600) : 1;
 
     return appear * fade;
@@ -638,6 +730,155 @@ export class WorldRenderer {
     context.bezierCurveTo(x - size, y - size * 0.3, x - size * 0.4, y - size, x, y - size * 0.4);
     context.bezierCurveTo(x + size * 0.4, y - size, x + size, y - size * 0.3, x, y + size * 0.4);
     context.fill();
+  }
+
+  private eggShellPath(context: CanvasRenderingContext2D, width: number, height: number): void {
+    context.beginPath();
+    context.ellipse(0, 0, width, height, 0, 0, Math.PI * 2);
+  }
+
+  private drawEggs(context: CanvasRenderingContext2D, now: number): void {
+    for (const incubation of this.eggs.values()) this.drawEgg(context, incubation, now);
+  }
+
+  private drawEgg(context: CanvasRenderingContext2D, incubation: Incubation, now: number): void {
+    const { egg, hue } = incubation;
+    const look = stageLook(egg.stage);
+    const seconds = now / 1000;
+    const failed = incubation.failAt > 0;
+    const width = 22;
+    const height = 29;
+    const breath = failed ? 0.15 : 0.55 + Math.sin(seconds * 2.2) * 0.25;
+    const wobble = this.reducedMotion ? 0 : Math.sin(seconds * look.wobbleRate * Math.PI) * look.wobbleAngle;
+    const hatch = incubation.hatchAt > 0 ? hatchProgress(now - incubation.hatchAt) : null;
+
+    context.save();
+    context.translate(egg.x, egg.y + height);
+    context.rotate(wobble);
+    context.translate(0, -height);
+
+    if (!failed) {
+      context.globalCompositeOperation = "lighter";
+      const halo = context.createRadialGradient(0, 0, 4, 0, 0, height * 2.2);
+      halo.addColorStop(0, `hsla(${hue}, 100%, 65%, ${0.35 * breath})`);
+      halo.addColorStop(1, `hsla(${hue}, 100%, 50%, 0)`);
+      context.fillStyle = halo;
+      context.fillRect(-height * 2.2, -height * 2.2, height * 4.4, height * 4.4);
+      context.globalCompositeOperation = "source-over";
+    }
+
+    const halves = hatch ? [-1, 1] : [0];
+
+    for (const side of halves) {
+      context.save();
+
+      if (hatch) {
+        const fly = hatch.split * 34;
+        context.translate(side * fly, -hatch.split * 12 + hatch.split * hatch.split * 30);
+        context.rotate(side * hatch.split * 1.4);
+        context.globalAlpha = 1 - hatch.split;
+        context.beginPath();
+        context.rect(side < 0 ? -width - 2 : 0, -height - 2, width + 2, height * 2 + 4);
+        context.clip();
+      }
+
+      this.drawShell(context, incubation, width, height, breath, failed);
+      context.restore();
+    }
+
+    context.restore();
+
+    if (!hatch) this.drawEggLabel(context, egg.x, egg.y + height * 2 + 10, STAGE_LABELS[egg.stage], failed);
+  }
+
+  private drawShell(
+    context: CanvasRenderingContext2D,
+    incubation: Incubation,
+    width: number,
+    height: number,
+    breath: number,
+    failed: boolean,
+  ): void {
+    const { hue, egg } = incubation;
+    const look = stageLook(egg.stage);
+    const lightness = failed ? 14 : 78;
+    const shell = context.createRadialGradient(-width * 0.35, -height * 0.4, 2, 0, 0, height * 1.1);
+    shell.addColorStop(0, `hsl(${hue}, ${failed ? 5 : 40}%, ${lightness + 10}%)`);
+    shell.addColorStop(1, `hsl(${hue}, ${failed ? 5 : 35}%, ${lightness - 30}%)`);
+    this.eggShellPath(context, width, height);
+    context.fillStyle = shell;
+    context.fill();
+
+    if (!failed) {
+      context.save();
+      this.eggShellPath(context, width, height);
+      context.clip();
+      context.globalCompositeOperation = "lighter";
+      const core = context.createRadialGradient(0, height * 0.15, 1, 0, height * 0.15, height * 0.9);
+      core.addColorStop(0, `hsla(${hue}, 100%, 70%, ${0.55 * breath})`);
+      core.addColorStop(1, `hsla(${hue}, 100%, 50%, 0)`);
+      context.fillStyle = core;
+      context.fillRect(-width, -height, width * 2, height * 2);
+      context.restore();
+    }
+
+    context.fillStyle = `hsla(${(hue + 180) % 360}, 30%, ${failed ? 8 : 35}%, 0.75)`;
+
+    for (const dot of incubation.dots) {
+      context.beginPath();
+      context.ellipse(
+        Math.cos(dot.angle) * dot.radius * width,
+        Math.sin(dot.angle) * dot.radius * height,
+        dot.size * width,
+        dot.size * width * 0.8,
+        dot.angle,
+        0,
+        Math.PI * 2,
+      );
+      context.fill();
+    }
+
+    if (look.crackCount > 0) {
+      const glow = look.crackGlow * (0.7 + breath * 0.5);
+      context.lineWidth = 0.9;
+      context.strokeStyle = failed
+        ? "rgba(0, 0, 0, 0.9)"
+        : `hsla(${hue}, 100%, ${60 + glow * 30}%, ${0.4 + glow * 0.6})`;
+      context.shadowColor = failed ? "transparent" : `hsl(${hue}, 100%, 70%)`;
+      context.shadowBlur = failed ? 0 : glow * 8;
+
+      for (const crack of cracks(egg.seed || egg.id, look.crackCount)) {
+        context.beginPath();
+
+        for (const [index, point] of crack.points.entries()) {
+          const x = point.x * width;
+          const y = point.y * height;
+
+          if (index === 0) context.moveTo(x, y);
+          else context.lineTo(x, y);
+        }
+
+        context.stroke();
+      }
+
+      context.shadowBlur = 0;
+    }
+
+    context.strokeStyle = failed ? "rgba(60, 60, 60, 0.8)" : `hsla(${hue}, 60%, 85%, 0.6)`;
+    context.lineWidth = 0.8;
+    this.eggShellPath(context, width, height);
+    context.stroke();
+  }
+
+  private drawEggLabel(context: CanvasRenderingContext2D, x: number, y: number, text: string, failed: boolean): void {
+    context.font = "bold 10px ui-monospace, monospace";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    const width = context.measureText(text).width + 12;
+    context.fillStyle = "rgba(4, 14, 18, 0.85)";
+    context.fillRect(x - width / 2, y - 8, width, 16);
+    context.fillStyle = failed ? "#fca5a5" : "#e6fff6";
+    context.fillText(text, x, y);
   }
 
   private drawEncounterRing(context: CanvasRenderingContext2D, now: number): void {

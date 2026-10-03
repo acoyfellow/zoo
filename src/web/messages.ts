@@ -35,13 +35,32 @@ export const Encounter = z.object({
 
 export type Encounter = z.infer<typeof Encounter>;
 
+export const EggStage = z.enum(["laid", "safety", "code", "sprite", "ready", "failed"]);
+
+export type EggStage = z.infer<typeof EggStage>;
+
+export const Egg = z.object({
+  id: z.string(),
+  x: z.number(),
+  y: z.number(),
+  seed: z.string(),
+  stage: EggStage,
+  creatureId: z.string().nullable(),
+  error: z.string().nullable(),
+  at: z.number(),
+});
+
+export type Egg = z.infer<typeof Egg>;
+
 export const WorldMessage = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("snapshot"),
     creatures: z.array(Creature),
     events: z.array(WorldEvent),
     encounters: z.array(Encounter).catch([]),
+    eggs: z.array(Egg).catch([]),
   }),
+  z.object({ type: z.literal("egg"), egg: Egg }),
   z.object({ type: z.literal("event"), event: WorldEvent }),
   z.object({ type: z.literal("encounter"), encounter: Encounter }),
   z.object({ type: z.literal("sprite"), id: z.string(), sprite: SpriteState }),

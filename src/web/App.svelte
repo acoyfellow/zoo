@@ -2,6 +2,7 @@
 import { onMount } from "svelte";
 import {
   type Creature,
+  type Egg,
   type Encounter,
   type LineageCreature,
   LineageReply,
@@ -9,6 +10,7 @@ import {
   type WorldEvent,
   WorldMessage,
 } from "./messages";
+import { STAGE_LABELS } from "./world/egg";
 import { WorldRenderer } from "./world/renderer";
 
 type Connection = "connecting" | "open" | "lost";
@@ -38,6 +40,12 @@ let canvas: HTMLCanvasElement | undefined = $state();
 let renderer: WorldRenderer | null = null;
 
 let soundOn = $state(false);
+
+let myEgg = $state<Egg | null>(null);
+
+let lastDescription = $state("");
+
+const eggStageText = $derived(myEgg ? STAGE_LABELS[myEgg.stage] : "");
 
 function toggleSound(): void {
   soundOn = !soundOn;
@@ -79,12 +87,17 @@ function connect(): void {
     if (data.type === "snapshot") {
       creatures = data.creatures;
       renderer?.update(data.creatures);
+      renderer?.syncEggs(data.eggs);
 
       if (data.events.length > 0) events = data.events;
 
       if (data.encounters.length > 0) encounters = data.encounters;
     } else if (data.type === "event") {
       events = [...events.slice(-29), data.event];
+    } else if (data.type === "egg") {
+      renderer?.setEgg(data.egg);
+
+      if (myEgg && data.egg.id === myEgg.id) myEgg = { ...data.egg, seed: myEgg.seed };
     } else if (data.type === "sprite") {
       renderer?.setSprite(data.id, data.sprite);
     } else if (data.type === "meeting") {
@@ -131,24 +144,62 @@ function parentsOf(creature: LineageCreature): string {
   return `child of ${nameOf(creature.parent_a)} and ${nameOf(creature.parent_b)}`;
 }
 
+function layEgg(text: string): Egg {
+  const angle = Math.random() * Math.PI * 2;
+  const reach = 60 + Math.random() * 140;
+
+  const egg: Egg = {
+    id: crypto.randomUUID(),
+    x: 400 + Math.cos(angle) * reach,
+    y: 400 + Math.sin(angle) * reach,
+    seed: text,
+    stage: "laid",
+    creatureId: null,
+    error: null,
+    at: Date.now(),
+  };
+
+  renderer?.setEgg(egg);
+
+  return egg;
+}
+
+function failEgg(message: string): void {
+  status = message;
+
+  if (myEgg && myEgg.stage !== "failed") {
+    myEgg = { ...myEgg, stage: "failed", error: message };
+    renderer?.setEgg(myEgg);
+  }
+}
+
+function retry(): void {
+  if (myEgg) renderer?.dropEgg(myEgg.id);
+  myEgg = null;
+  description = lastDescription;
+  void hatch();
+}
+
 async function hatch(): Promise<void> {
   busy = true;
-  status =
-    "A safety check runs, then the model writes a behavior. This can take up to one minute. The sprite appears a few seconds after the creature hatches.";
+  lastDescription = description;
+  const egg = layEgg(description);
+  myEgg = egg;
+  status = "The egg is in the world. It hatches when the server finishes. This can take up to one minute.";
 
   try {
     const response = await fetch("/api/creatures", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ description }),
+      body: JSON.stringify({ description, egg: { id: egg.id, x: egg.x, y: egg.y } }),
     });
 
     const reply = SpawnReply.safeParse(await response.json());
 
     if (!reply.success) {
-      status = "The server sent an answer that the page cannot read. Try again.";
+      failEgg("The server sent an answer that the page cannot read. Try again.");
     } else if ("error" in reply.data) {
-      status = reply.data.error;
+      failEgg(reply.data.error);
     } else {
       status = `${reply.data.name} hatched. Look for its name in the world.`;
       lastCode = reply.data.code;
@@ -156,7 +207,7 @@ async function hatch(): Promise<void> {
       void loadLineage();
     }
   } catch {
-    status = "The request failed. Check your connection and try again.";
+    failEgg("The request failed. Check your connection and try again.");
   } finally {
     busy = false;
   }
@@ -236,6 +287,18 @@ onMount(() => {
         {busy ? "Hatching" : "Hatch creature"}
       </button>
       <p class="text-xs text-emerald-300 min-h-4" role="status">{status}</p>
+      <p class="text-sm text-emerald-200 min-h-5" aria-live="polite" data-egg-stage={myEgg?.stage ?? ""}>
+        {#if myEgg}Egg: {eggStageText}{/if}
+      </p>
+      {#if myEgg?.stage === "failed"}
+        <button
+          type="button"
+          onclick={retry}
+          class="rounded-xl border border-amber-400 min-h-11 py-2 text-amber-200 hover:bg-amber-500/20 focus-visible:outline-2 focus-visible:outline-amber-300"
+        >
+          Retry
+        </button>
+      {/if}
       <p class="text-[11px] text-emerald-500">
         Limits: 3 hatch requests per minute and 10 creatures per hour from one address. 200 creatures alive at most.
         Descriptions, names, and code are public.

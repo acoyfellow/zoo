@@ -1,8 +1,34 @@
 import { z } from "zod";
 
+export const EggPlacement = z.object({
+  id: z.string().uuid(),
+  x: z.number().finite(),
+  y: z.number().finite(),
+});
+
+export type EggPlacement = z.infer<typeof EggPlacement>;
+
 export const SpawnRequest = z.object({
   description: z.string().trim().min(3).max(400),
+  egg: EggPlacement.optional(),
 });
+
+export const EggStage = z.enum(["laid", "safety", "code", "sprite", "ready", "failed"]);
+
+export type EggStage = z.infer<typeof EggStage>;
+
+export const EggView = z.object({
+  id: z.string(),
+  x: z.number(),
+  y: z.number(),
+  seed: z.string(),
+  stage: EggStage,
+  creatureId: z.string().nullable(),
+  error: z.string().nullable(),
+  at: z.number(),
+});
+
+export type EggView = z.infer<typeof EggView>;
 
 export const ActionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("move"), dx: z.number().finite(), dy: z.number().finite() }),
@@ -85,7 +111,9 @@ export const WorldMessage = z.discriminatedUnion("type", [
     creatures: z.array(CreatureView),
     events: z.array(WorldEvent),
     encounters: z.array(EncounterView),
+    eggs: z.array(EggView),
   }),
+  z.object({ type: z.literal("egg"), egg: EggView }),
   z.object({ type: z.literal("event"), event: WorldEvent }),
   z.object({ type: z.literal("encounter"), encounter: EncounterView }),
   z.object({ type: z.literal("sprite"), id: z.string(), sprite: SpriteState }),

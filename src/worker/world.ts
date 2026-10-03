@@ -4,10 +4,22 @@ import { DurableObject } from "cloudflare:workers";
 import { z } from "zod";
 import { type Fighter, judgeEncounter } from "./ai";
 import { mergedDescription, paintSprite, spriteKey } from "./art";
-import { applyMove, clampToWorld, creatureModule, EDGE_MARGIN, hueFor, mergeBehaviors, WORLD_SIZE } from "./behavior";
+import {
+  applyMove,
+  childName,
+  clampToWorld,
+  creatureModule,
+  EDGE_MARGIN,
+  hueFor,
+  mergeBehaviors,
+  WORLD_SIZE,
+} from "./behavior";
 import {
   CreatureState,
   type CreatureView,
+  type EggPlacement,
+  type EggStage,
+  type EggView,
   type EncounterView,
   type NewCreature,
   NewCreature as NewCreatureSchema,
@@ -45,6 +57,7 @@ export class World extends DurableObject<Env> {
   private backfilled = false;
   private events: WorldEvent[] = [];
   private encounters: EncounterView[] = [];
+  private eggs = new Map<string, EggView>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -117,19 +130,56 @@ export class World extends DurableObject<Env> {
     if ((await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(Date.now() + TICK_MS);
   }
 
-  private async paint(id: string, description: string): Promise<void> {
+  private liveEggs(): EggView[] {
+    const now = Date.now();
+
+    for (const [id, egg] of this.eggs) if (now - egg.at > 180_000) this.eggs.delete(id);
+
+    return [...this.eggs.values()];
+  }
+
+  async incubate(
+    placement: EggPlacement,
+    seed: string,
+    stage: EggStage,
+    detail: { creatureId?: string; error?: string } = {},
+  ): Promise<void> {
+    const position = clampToWorld(placement.x, placement.y);
+    const previous = this.eggs.get(placement.id);
+
+    const egg: EggView = {
+      id: placement.id,
+      x: position.x,
+      y: position.y,
+      seed: seed.slice(0, 400),
+      stage,
+      creatureId: detail.creatureId ?? previous?.creatureId ?? null,
+      error: detail.error ?? null,
+      at: Date.now(),
+    };
+
+    this.eggs.set(egg.id, egg);
+    this.broadcast({ type: "egg", egg });
+
+    if (stage === "ready" || stage === "failed") this.eggs.delete(egg.id);
+  }
+
+  private async paint(id: string, description: string, egg?: EggPlacement): Promise<void> {
     const result = await paintSprite(this.env, id, description);
     const state = result.ok ? "ready" : "glyph";
 
     if (!result.ok) console.error("sprite failed", id, result.reason);
     this.ctx.storage.sql.exec("UPDATE creatures SET sprite = ? WHERE id = ?", state, id);
     this.broadcast({ type: "sprite", id, sprite: state });
+
+    if (egg) await this.incubate(egg, description, "ready", { creatureId: id });
   }
 
   async addCreature(
     input: NewCreature,
     description: string,
     near?: { x: number; y: number },
+    egg?: EggPlacement,
   ): Promise<{ alive: number }> {
     const creature = NewCreatureSchema.parse(input);
     const alive = this.rows().length;
@@ -146,16 +196,30 @@ export class World extends DurableObject<Env> {
       creature.generation,
     );
     this.announce(`${creature.name} hatched`);
-    this.ctx.waitUntil(this.paint(creature.id, description));
+
+    if (egg) await this.incubate(egg, description, "sprite", { creatureId: creature.id });
+    this.ctx.waitUntil(this.paint(creature.id, description, egg));
     await this.ensureAlarm();
 
     return { alive: alive + 1 };
   }
 
-  private async topUpStarters(): Promise<void> {
-    const missing = STARTER_COUNT - this.rows().length;
+  private uniqueName(wanted: string): string {
+    const taken = new Set(this.rows().map((row) => row.name));
 
-    for (const starter of STARTERS.slice(0, Math.max(0, missing))) {
+    if (!taken.has(wanted)) return wanted;
+
+    for (let suffix = 2; suffix < 1000; suffix++) if (!taken.has(`${wanted} ${suffix}`)) return `${wanted} ${suffix}`;
+
+    return wanted;
+  }
+
+  private async topUpStarters(): Promise<void> {
+    const alive = this.rows();
+    const missing = STARTER_COUNT - alive.length;
+    const absent = STARTERS.filter((starter) => !alive.some((row) => row.name === starter.name));
+
+    for (const starter of absent.slice(0, Math.max(0, missing))) {
       const id = crypto.randomUUID();
       await this.env.DB.prepare(
         "INSERT INTO creatures (id, name, description, code, model, ip_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -200,6 +264,7 @@ export class World extends DurableObject<Env> {
         creatures: this.rows().map((r) => this.view(r)),
         events: this.events,
         encounters: this.encounters,
+        eggs: this.liveEggs(),
       }),
     );
     await this.ensureAlarm();
@@ -281,7 +346,13 @@ export class World extends DurableObject<Env> {
     for (const row of after.filter((r) => r.energy <= 0)) await this.fade(row, "ran out of energy");
 
     if (this.ctx.getWebSockets().length > 0) await this.topUpStarters();
-    this.broadcast({ type: "snapshot", creatures: this.rows().map((r) => this.view(r)), events: [], encounters: [] });
+    this.broadcast({
+      type: "snapshot",
+      creatures: this.rows().map((r) => this.view(r)),
+      events: [],
+      encounters: [],
+      eggs: [],
+    });
     this.findEncounter(this.rows());
 
     if (this.rows().length > 0 || this.ctx.getWebSockets().length > 0)
@@ -415,7 +486,7 @@ export class World extends DurableObject<Env> {
     if (this.rows().length >= MAX_ALIVE) return null;
     const id = crypto.randomUUID();
     const code = mergeBehaviors(a.code, b.code, id.slice(0, 6));
-    const name = `${a.name.slice(0, 4)}${b.name.slice(-3)}`;
+    const name = this.uniqueName(childName(a.name, b.name, id));
     const generation = Math.max(a.generation, b.generation) + 1;
     const description = mergedDescription(await this.descriptionOf(a.id), await this.descriptionOf(b.id));
     await this.env.DB.prepare(

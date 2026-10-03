@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { compactFighter, parseVerdict } from "../src/worker/ai";
 import {
   applyMove,
+  childName,
   clampToWorld,
   EDGE_MARGIN,
   extractCode,
@@ -84,5 +86,52 @@ describe("schemas", () => {
   });
   test("tick result rejects unknown actions", () => {
     expect(TickResult.safeParse({ ok: true, actions: [{ type: "explode" }] }).success).toBe(false);
+  });
+});
+
+describe("clef judge", () => {
+  const liveClefResponse = JSON.stringify({
+    model: "clef",
+    answers: {
+      outcome: {
+        type: "choice",
+        choice: "befriend",
+        probabilities: { a_wins: 0.1607, b_wins: 0.2783, befriend: 0.561 },
+        confidence: 0.127,
+      },
+    },
+    usage: { input_tokens: 165, output_tokens: 0 },
+  });
+
+  test("parses a real Clef response", () => {
+    const verdict = parseVerdict(liveClefResponse);
+    expect(verdict.choice).toBe("befriend");
+    expect(verdict.probabilities).toEqual({ a_wins: 0.1607, b_wins: 0.2783, befriend: 0.561 });
+  });
+
+  test("keeps deep-generation fighters inside the Clef context window", () => {
+    const huge = "x".repeat(200_000);
+
+    const compact = compactFighter({
+      name: "Seekbit",
+      description: huge,
+      energy: 12.345,
+      memory: Object.fromEntries(Array.from({ length: 50 }, (_, i) => [`k${i}`, huge])),
+      code: huge,
+    });
+
+    expect(JSON.stringify(compact).length).toBeLessThan(3000);
+  });
+});
+
+describe("childName", () => {
+  test("mixes both parents", () => {
+    expect(childName("Seeker", "Orbit", "a")).toBe("Seebit");
+  });
+  test("selfing still gives a new name", () => {
+    expect(childName("Drifter", "Drifter", "seed")).not.toBe("Drifter");
+  });
+  test("starters have distinct names", () => {
+    expect(new Set(STARTERS.map((s) => s.name)).size).toBe(STARTERS.length);
   });
 });
