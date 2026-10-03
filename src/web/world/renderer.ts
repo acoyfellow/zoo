@@ -168,8 +168,38 @@ export class WorldRenderer {
     }
 
     for (const [id, body] of this.bodies) {
-      if (!seen.has(id) && body.dying === 0) body.dying = now;
+      if (!seen.has(id) && body.dying === 0 && !id.startsWith("bench-")) body.dying = now;
     }
+  }
+
+  bench(count: number): void {
+    const sources = [...this.bodies.values()].filter((body) => body.art !== null);
+    const now = performance.now();
+
+    for (let i = 0; i < count; i++) {
+      const source = sources[i % Math.max(1, sources.length)];
+
+      if (!source) return;
+      const angle = (i / count) * Math.PI * 2 + now / 3000;
+      const ring = 120 + (i % 5) * 50;
+      const position = { x: 400 + Math.cos(angle) * ring, y: 400 + Math.sin(angle) * ring };
+      const id = `bench-${i}`;
+      const existing = this.bodies.get(id);
+      const creature = { ...source.creature, id, x: position.x, y: position.y };
+
+      if (existing) {
+        existing.from = { ...existing.position };
+        existing.to = position;
+        continue;
+      }
+
+      const body = this.spawnBody(creature, now);
+      body.art = source.art;
+      body.artState = "bench";
+      this.bodies.set(id, body);
+    }
+
+    this.snapshotAt = now;
   }
 
   setSprite(id: string, sprite: Creature["sprite"]): void {
@@ -519,7 +549,7 @@ export class WorldRenderer {
   }
 
   private sizeOf(body: Body): number {
-    return 34 + Math.min(body.creature.energy, 20) * 0.8;
+    return 70 + Math.min(body.creature.energy, 20) * 1.2;
   }
 
   private bodyScale(body: Body, now: number): number {

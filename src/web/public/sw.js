@@ -1,4 +1,4 @@
-const CACHE_NAME = "zoo-shell-v1";
+const CACHE_NAME = "zoo-shell-v2";
 
 const SHELL = ["/", "/favicon.svg", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 

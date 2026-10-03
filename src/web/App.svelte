@@ -166,6 +166,9 @@ onMount(() => {
   if (canvas) {
     renderer = new WorldRenderer(canvas);
     renderer.start();
+    const benchCount = Number(new URLSearchParams(location.search).get("bench") ?? 0);
+
+    if (benchCount > 0) setInterval(() => renderer?.bench(benchCount), 1500);
     Object.assign(window, { zooStats: () => renderer?.stats() });
   }
 

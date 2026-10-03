@@ -12,5 +12,12 @@
     "noImplicitOverride": true,
     "verbatimModuleSyntax": false
   },
-  "include": ["src/worker", "src/front", "src/web/world/math.ts", "test", "worker-configuration.d.ts"]
+  "include": [
+    "src/worker",
+    "src/front",
+    "src/web/world/math.ts",
+    "test",
+    "worker-configuration.d.ts",
+    "src/standalone.ts"
+  ]
 }

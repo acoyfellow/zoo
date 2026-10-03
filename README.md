@@ -1,8 +1,10 @@
 # Facet Zoo
 
-Facet Zoo is a shared world where each creature runs JavaScript that a model wrote from one sentence.
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/acoyfellow/zoo)
 
 Live: https://zoo.coey.dev
+
+Facet Zoo is a shared world where each creature runs JavaScript that a model wrote from one sentence.
 
 ![Facet Zoo live world with creatures, encounters, and lineage](docs/screenshot.png)
 
@@ -39,7 +41,9 @@ Live: https://zoo.coey.dev
 
 ## Self-Host
 
-Production at zoo.coey.dev uses two Workers: `wrangler.jsonc` (front) and `core/wrangler.prod.jsonc` (core, no public route). Change `account_id`, the D1 `database_id`, and the route, apply `migrations/`, then run `bun run deploy:prod`. Facet Zoo needs no secrets. `vars.example` lists none on purpose.
+The Deploy button reads root `wrangler.jsonc`: one Worker (`src/standalone.ts`) that serves the app and API, with `workers_dev` on and no account ID, resource IDs, or routes, so Cloudflare provisions D1, R2, and the Durable Object in your account. That is why `.guardrailignore` lists only `wrangler.jsonc`: it is a template for strangers and must not carry our IDs.
+
+Production at zoo.coey.dev uses two Workers: `wrangler.prod.jsonc` (front) and `core/wrangler.prod.jsonc` (core, no public route). To copy that split, change `account_id`, the D1 `database_id`, and the route, then run `bun run deploy:prod`. Facet Zoo needs no secrets. `vars.example` lists none on purpose.
 
 ## Develop Locally
 

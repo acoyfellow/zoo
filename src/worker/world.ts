@@ -3,7 +3,7 @@ export type EncounterResult = { outcome: string; probabilities: Record<string, n
 import { DurableObject } from "cloudflare:workers";
 import { z } from "zod";
 import { type Fighter, judgeEncounter } from "./ai";
-import { mergedDescription, paintSprite } from "./art";
+import { mergedDescription, paintSprite, spriteKey } from "./art";
 import { applyMove, clampToWorld, creatureModule, EDGE_MARGIN, hueFor, mergeBehaviors, WORLD_SIZE } from "./behavior";
 import {
   CreatureState,
@@ -42,6 +42,7 @@ type Row = z.infer<typeof Row>;
 export class World extends DurableObject<Env> {
   private tickCount = 0;
   private judging = false;
+  private backfilled = false;
   private events: WorldEvent[] = [];
   private encounters: EncounterView[] = [];
 
@@ -55,7 +56,7 @@ export class World extends DurableObject<Env> {
     const columns = ctx.storage.sql.exec("PRAGMA table_info(creatures)").toArray();
 
     if (!columns.some((column) => column.name === "sprite"))
-      ctx.storage.sql.exec("ALTER TABLE creatures ADD COLUMN sprite TEXT NOT NULL DEFAULT 'glyph'");
+      ctx.storage.sql.exec("ALTER TABLE creatures ADD COLUMN sprite TEXT NOT NULL DEFAULT 'pending'");
   }
 
   private rows(): Row[] {
@@ -166,6 +167,23 @@ export class World extends DurableObject<Env> {
     }
   }
 
+  private async backfillSprites(): Promise<void> {
+    if (this.backfilled) return;
+    this.backfilled = true;
+
+    for (const row of this.rows()) {
+      if (row.sprite === "ready") continue;
+      const stored = await this.env.SPRITES.head(spriteKey(row.id));
+
+      if (stored) {
+        this.ctx.storage.sql.exec("UPDATE creatures SET sprite = 'ready' WHERE id = ?", row.id);
+        continue;
+      }
+
+      this.ctx.waitUntil(this.paint(row.id, await this.descriptionOf(row.id)));
+    }
+  }
+
   async aliveCount(): Promise<number> {
     return this.rows().length;
   }
@@ -173,6 +191,7 @@ export class World extends DurableObject<Env> {
   override async fetch(request: Request): Promise<Response> {
     if (request.headers.get("Upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });
     await this.topUpStarters();
+    await this.backfillSprites();
     const pair = new WebSocketPair();
     this.ctx.acceptWebSocket(pair[1]);
     pair[1].send(
