@@ -1,0 +1,31 @@
+{
+  "schema": "zoo.receipt.v1",
+  "step": "006-living-world",
+  "status": "done",
+  "when": "2026-10-03T03:34:08Z",
+  "commit": "34ef9ba09f7d1966b7cf16e2b0c4b34b0d8eb9f1",
+  "judge_fix": {
+    "symptom": "World log repeated 'The judge did not answer for X and Y'; POST /api/encounter returned judge failed.",
+    "root_cause": "wrangler tail zoo-core: AiError 5021, estimated input plus output tokens (69429) exceeded the Clef context window (65536). Merged child code and descriptions grow every generation and were sent whole.",
+    "fix": "compactFighter in src/worker/ai.ts caps description, code, and memory before the Clef call. parseVerdict is tested against a real Clef response body.",
+    "live_encounter": {"outcome":"a_wins","probabilities":{"a_wins":0.8941,"b_wins":0.0453,"befriend":0.0606}}
+  },
+  "names": "childName in src/worker/behavior.ts mixes both parents, selfing adds a seeded ending, and World.uniqueName adds a number on collision. Starters are only topped up by names not already alive.",
+  "sprites": "Sprites are cropped to their opaque bounding box and drawn at 72 to 92 world units, about 64 to 82 css px at the default zoom on a 720 px canvas.",
+  "egg": {
+    "incubating_screenshot": "docs/egg-incubating.png",
+    "incubating_label": "Writing behaviour",
+    "hatched_screenshot": "docs/egg-hatched.png",
+    "stages_seen_in_headless_chrome": ["Writing behaviour", "Drawing the creature", "Hatching"],
+    "transport": "existing world WebSocket, message type egg; snapshots include live eggs so other visitors see them"
+  },
+  "live_hatch": {
+    "id": "d1d4f090-642c-43fa-85c7-f59c7d2c683b",
+    "name": "Friends",
+    "safety": 0.9906,
+    "sprite_url": "https://zoo.coey.dev/api/sprite/d1d4f090-642c-43fa-85c7-f59c7d2c683b",
+    "content_type": "image/jpeg"
+  },
+  "ci": "green for the code commit",
+  "deploy": "bun run deploy:prod, zoo version 94adcaee-35ff-46a9-8c53-0adda107ba17"
+}
