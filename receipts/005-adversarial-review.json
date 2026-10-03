@@ -1,0 +1,34 @@
+{
+  "reviewer": "terrarium child ter_20261003041723733_o4tvnx",
+  "commits": ["dc70cf1", "af516bc"],
+  "profiles": [
+    {"profile": "Dane Knecht", "question": "Shipped and watched it run?", "evidence": "Deployed twice (core versions 46deca9f, ab47a493). Headless Chrome on https://zoo.coey.dev showed 13 alive, encounters judged, docs/after-review.png.", "findings": [
+      {"finding": "Population descended from one starter; names like Drifofofik 2", "severity": "high", "verdict": "fixed", "commit": "dc70cf1", "fix": "childName(seed) builds syllable names (src/worker/behavior.ts childName); each starter is its own family and is re-seeded when its family dies out (world.ts seedStarters); a winner no longer breeds with itself"},
+      {"finding": "Concurrent websocket connects seeded duplicate starters (two Drifter, two Shadow in lineage)", "severity": "medium", "verdict": "fixed", "commit": "af516bc", "fix": "topUpStarters is serialized and duplicate founders fade"},
+      {"finding": "Hatch-and-watch of a user creature not executed in this run", "severity": "info", "verdict": "open", "reason": "Not done, so the hatch rate limit stays available for real visitors; receipt 006 covers egg incubation"}
+    ]},
+    {"profile": "Kenton Varda", "question": "What can creature code reach?", "evidence": "world.ts facet(): LOADER.get with globalOutbound null, so there is no internet. env is not passed to the creature module, so it has no bindings. Storage is a per-id facet SQLite. behavior.ts validateBehavior blocks import, fetch, eval, Function, globalThis, constructor, while.", "findings": [
+      {"finding": "No explicit CPU limit on the loaded worker; it relies on the platform default", "severity": "low", "verdict": "open", "reason": "Not changed in this run; needs a limits check against the Worker Loader docs"}
+    ]},
+    {"profile": "Ana Foppa", "question": "Escape, abuse, XSS, spoofed headers?", "evidence": "No {@html} or innerHTML in src/web, so names and speech render as text. Spoofed X-Forwarded-For gave 400,400,400,400,429: guard.ts keys on CF-Connecting-IP. Client-set CF-Connecting-IP got 403 at the edge.", "findings": [
+      {"finding": "No CSP or X-Content-Type-Options header on /", "severity": "low", "verdict": "open", "reason": "Not fixed in this run"},
+      {"finding": "Five hostile behavior descriptions not sent live", "severity": "info", "verdict": "open", "reason": "The static denylist is covered by test/behavior.test.ts; I did not call the model live"}
+    ]},
+    {"profile": "Michelle Wong", "question": "Mobile and desktop journey?", "evidence": "rv.mjs at 390x844 and 1280x900: same copy, no page errors after af516bc.", "findings": [
+      {"finding": "Svelte each_key_duplicate page error in the world log", "severity": "medium", "verdict": "fixed", "commit": "af516bc"},
+      {"finding": "Copy said creatures meet within 24 pixels", "severity": "low", "verdict": "fixed", "commit": "af516bc", "fix": "Meet distance is now 80 so creatures that keep personal space can still meet. The copy says 80."}
+    ]},
+    {"profile": "Kevin Kipp", "question": "Animation quality and frame time?", "evidence": "180 rAF samples in headless Chrome: p50 16.7 ms, p95 16.7 ms on desktop and mobile.", "findings": [
+      {"finding": "Creatures piled on one point: starters spawned within 80 px of the center, children spawned at the parents' midpoint, and the Drifter code pulls everything to the center; there was no separation", "severity": "high", "verdict": "fixed", "commit": "dc70cf1", "fix": "separate() enforces 72 px personal space each tick; starters spawn in four quadrants; test 'separate pushes stacked creatures apart'"}
+    ]},
+    {"profile": "Tom McAuliffe", "question": "How do we fix this at 3am?", "evidence": "observability enabled in core/wrangler.prod.jsonc; console.error for sprite and judge failures in world.ts.", "findings": [
+      {"finding": "No runbook or alerts", "severity": "medium", "verdict": "open", "reason": "Out of scope for this run"}
+    ]},
+    {"profile": "Tom Bremer", "question": "Less code?", "evidence": "STARTER_COUNT removed; self-breeding branch removed.", "findings": []},
+    {"profile": "Truth audit", "question": "Is every claim backed by a file and line?", "evidence": "receipts/004-truth-audit.json was not written in this run.", "findings": [
+      {"finding": "Truth audit receipt missing", "severity": "medium", "verdict": "open"}
+    ]}
+  ],
+  "encounters": {"finding": "Encounters were almost all between relatives", "severity": "high", "verdict": "fixed", "commit": "dc70cf1", "fix": "pickEncounter prefers pairs from different families; test 'encounters prefer strangers over relatives'. In the live check, 6 of the 6 shown encounters were between differently named creatures."},
+  "liveRecheck": {"screenshot": "docs/after-review.png", "pageErrors": 0, "frameTimeMs": {"p50": 16.7, "p95": 16.7}, "ci": "green"}
+}
