@@ -1,7 +1,5 @@
 export type Starter = { name: string; description: string; code: string };
 
-export const STARTER_COUNT = 4;
-
 export const STARTERS: Starter[] = [
   {
     name: "Seeker",

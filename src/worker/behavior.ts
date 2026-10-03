@@ -186,13 +186,84 @@ export function nameFrom(description: string): string {
   return pick.slice(0, 1).toUpperCase() + pick.slice(1, 10).toLowerCase();
 }
 
-const NAME_ENDINGS = ["ix", "o", "ara", "en", "ul", "ette", "ik", "os", "ina", "ar"];
+const NAME_STARTS = [
+  "Bo",
+  "Ka",
+  "Mi",
+  "Lu",
+  "Ze",
+  "Ta",
+  "Ri",
+  "No",
+  "Pe",
+  "Su",
+  "Vi",
+  "Ju",
+  "Fen",
+  "Gro",
+  "Ish",
+  "Wren",
+];
 
-export function childName(a: string, b: string, seed: string): string {
-  const left = a.slice(0, Math.max(2, Math.ceil(a.length / 2)));
-  const right = b.slice(Math.floor(b.length / 2)).toLowerCase();
-  const ending = NAME_ENDINGS[hueFor(seed) % NAME_ENDINGS.length] ?? "o";
-  const base = a === b ? `${left}${ending}` : `${left}${right}`;
+const NAME_MIDDLES = ["ba", "lo", "mi", "ra", "ku", "te", "zo", "vi"];
 
-  return base.slice(0, 12);
+const NAME_ENDS = ["x", "n", "ra", "ble", "pip", "sk", "mo", "tt", "lin", "wick"];
+
+function digit(seed: string, salt: number, size: number): number {
+  return hueFor(`${salt}:${seed}`) % size;
+}
+
+export function childName(seed: string): string {
+  const start = NAME_STARTS[digit(seed, 1, NAME_STARTS.length)] ?? "Bo";
+  const middle = NAME_MIDDLES[digit(seed, 2, NAME_MIDDLES.length)] ?? "ba";
+  const end = NAME_ENDS[digit(seed, 3, NAME_ENDS.length)] ?? "x";
+
+  return `${start}${middle}${end}`;
+}
+
+export const PERSONAL_SPACE = 72;
+
+export function separate<T extends WorldPoint & { id: string }>(points: T[]): Map<string, WorldPoint> {
+  const moved = new Map<string, WorldPoint>(points.map((p) => [p.id, { x: p.x, y: p.y }]));
+
+  for (const a of points) {
+    for (const b of points) {
+      if (a.id >= b.id) continue;
+      const pa = moved.get(a.id);
+      const pb = moved.get(b.id);
+
+      if (!pa || !pb) continue;
+      const dx = pb.x - pa.x || hueFor(a.id + b.id) / 360 - 0.5;
+      const dy = pb.y - pa.y || hueFor(b.id + a.id) / 360 - 0.5;
+      const distance = Math.hypot(dx, dy);
+
+      if (distance >= PERSONAL_SPACE) continue;
+      const push = (PERSONAL_SPACE - distance) / 2 / distance;
+      moved.set(a.id, clampToWorld(pa.x - dx * push, pa.y - dy * push));
+      moved.set(b.id, clampToWorld(pb.x + dx * push, pb.y + dy * push));
+    }
+  }
+
+  return moved;
+}
+
+export const MEET_DISTANCE = 80;
+
+export function pickEncounter<T extends { id: string; x: number; y: number; family: string; cooldown_until: number }>(
+  all: T[],
+  now: number,
+): [T, T] | null {
+  const ready = all.filter((r) => r.cooldown_until < now);
+  let kin: [T, T] | null = null;
+
+  for (const a of ready) {
+    for (const b of ready) {
+      if (a.id >= b.id || Math.hypot(a.x - b.x, a.y - b.y) >= MEET_DISTANCE) continue;
+
+      if (a.family !== b.family) return [a, b];
+      kin ??= [a, b];
+    }
+  }
+
+  return kin;
 }

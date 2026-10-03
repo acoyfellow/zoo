@@ -8,6 +8,8 @@ import {
   extractCode,
   mergeBehaviors,
   nameFrom,
+  pickEncounter,
+  separate,
   validateBehavior,
 } from "../src/worker/behavior";
 import { ClefOutput, TickResult } from "../src/worker/schema";
@@ -125,11 +127,25 @@ describe("clef judge", () => {
 });
 
 describe("childName", () => {
-  test("mixes both parents", () => {
-    expect(childName("Seeker", "Orbit", "a")).toBe("Seebit");
+  test("children of one parent get readable, varied names", () => {
+    const names = new Set(Array.from({ length: 40 }, (_, i) => childName(`child-${i}`)));
+    expect(names.size).toBeGreaterThan(30);
+
+    for (const name of names) expect(name).toMatch(/^[A-Z][a-z]{3,9}$/);
   });
-  test("selfing still gives a new name", () => {
-    expect(childName("Drifter", "Drifter", "seed")).not.toBe("Drifter");
+  test("separate pushes stacked creatures apart", () => {
+    const pile = Array.from({ length: 6 }, (_, i) => ({ id: `c${i}`, x: 400, y: 400 }));
+    let points = pile;
+
+    for (let round = 0; round < 20; round++) points = [...separate(points)].map(([id, p]) => ({ id, ...p }));
+
+    for (const a of points)
+      for (const b of points) if (a.id < b.id) expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThan(40);
+  });
+  test("encounters prefer strangers over relatives", () => {
+    const at = (id: string, family: string, x: number) => ({ id, family, x, y: 400, cooldown_until: 0 });
+    const pair = pickEncounter([at("a", "Drifter", 400), at("b", "Drifter", 410), at("c", "Seeker", 440)], 1);
+    expect(pair?.map((r) => r.family).sort()).toEqual(["Drifter", "Seeker"]);
   });
   test("starters have distinct names", () => {
     expect(new Set(STARTERS.map((s) => s.name)).size).toBe(STARTERS.length);
