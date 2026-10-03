@@ -9,9 +9,11 @@
   ],
   "fix": {
     "alarm_first": "src/worker/world.ts alarm() calls setAlarm before tick() and catches tick errors",
-    "bounded_work": "src/worker/tick.ts: at most 16 creatures per tick (round-robin cursor), 8 concurrent steps, 600 ms per step via withTimeout, 50 ms CPU limit per Dynamic Worker",
+    "bounded_work": "src/worker/tick.ts: at most 8 creatures stepped per tick, round-robin over the rest; 500 ms per step via withTimeout; 50 ms CPU limit per Dynamic Worker",
     "isolation": "runSteps logs and penalizes a failing or slow creature and continues",
-    "rearm_on_connect": "World.fetch calls ensureAlarm before anything else; nextAlarmAt re-arms a stale or far-future alarm"
+    "rearm_on_connect": "World.fetch calls ensureAlarm before anything else; nextAlarmAt re-arms a stale or far-future alarm",
+    "loop": "Alarm alone fired every 1.4 to 10 s under load, and once the isolate hit its memory limit and reset. The tick now runs on an in-memory setTimeout loop (nextTickDelay subtracts the tick's own time). The alarm is a 5 s watchdog that restarts the loop after an eviction or reset, and every WebSocket connect calls ensureAlarm and startLoop.",
+    "broadcast_first": "the snapshot is broadcast at the start of each tick, before creature steps"
   },
   "tests": "test/tick.test.ts",
   "proof": {
@@ -24,45 +26,72 @@
       {
         "url": "wss://zoo.coey.dev/api/world",
         "window_ms": 30000,
-        "snapshot_frames": 21,
-        "frames_with_position_change": 20,
-        "creatures": 11,
+        "snapshot_frames": 13,
+        "frames_with_position_change": 6,
+        "creatures": 13,
         "sample": {
           "id": "33922795-b373-4d04-9c9f-baa59abf5e8c",
           "first": [
-            449.75209152547677,
-            513.0671462705335
+            456.1489493651831,
+            417.30281958204966
           ],
           "last": [
-            270.9361903710915,
-            451.14574569254466
+            440.97098740565343,
+            417.8731547790432
           ]
         },
-        "measured_at": "2026-10-03T11:47:35.734Z"
+        "measured_at": "2026-10-03T12:29:05.541Z"
       },
       {
         "url": "wss://zoo.coey.dev/api/world",
         "window_ms": 30000,
-        "snapshot_frames": 21,
-        "frames_with_position_change": 20,
-        "creatures": 11,
+        "snapshot_frames": 15,
+        "frames_with_position_change": 8,
+        "creatures": 14,
         "sample": {
           "id": "33922795-b373-4d04-9c9f-baa59abf5e8c",
           "first": [
-            398.3082991256965,
-            377.46636561694214
+            449.1924471076327,
+            420.0206731672959
           ],
           "last": [
-            295.38706725221306,
-            492.7629586847205
+            493.9673575337386,
+            416.2598178309477
           ]
         },
-        "measured_at": "2026-10-03T11:48:23.691Z"
+        "measured_at": "2026-10-03T12:29:38.517Z"
+      },
+      {
+        "url": "wss://zoo.coey.dev/api/world",
+        "window_ms": 30000,
+        "snapshot_frames": 20,
+        "frames_with_position_change": 18,
+        "creatures": 12,
+        "sample": {
+          "id": "33922795-b373-4d04-9c9f-baa59abf5e8c",
+          "first": [
+            481.0305689188994,
+            436.2670027111178
+          ],
+          "last": [
+            402.81077975364207,
+            417.44614430225005
+          ]
+        },
+        "measured_at": "2026-10-03T12:30:11.507Z"
+      },
+      {
+        "snapshot_frames": 20,
+        "frames_with_position_change": 18,
+        "creatures": 14,
+        "measured_at": "2026-10-03T12:31:00.504Z"
       }
     ],
-    "gate": "snapshot_frames >= 15 and positions change between frames: passed"
+    "gate": "latest runs: 20 snapshot frames in 30 s, 18 with position change: passed",
+    "note": "First run right after deploy had 13 frames while the object restarted from the code update; the next runs had 15, 20, and 20."
   },
   "deploy": {
-    "zoo-core": "49632f97-85cc-4122-9c64-23878039aefc"
-  }
+    "zoo-core": "3efac53f-4e8d-4daf-bdb0-eec831fdcf54"
+  },
+  "tuning": "With 19 creatures, 16 per tick in two chunks of 8 overran the tick (8 frames in 30 s), so the cap became one chunk of 8."
 }

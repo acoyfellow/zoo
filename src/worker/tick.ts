@@ -1,10 +1,18 @@
 export const TICK_MS = 1500;
 
-export const STEP_TIMEOUT_MS = 600;
+export const WATCHDOG_MS = 5000;
+
+export const MIN_TICK_GAP_MS = 100;
+
+export function nextTickDelay(startedAt: number, now: number): number {
+  return Math.max(MIN_TICK_GAP_MS, TICK_MS - (now - startedAt));
+}
+
+export const STEP_TIMEOUT_MS = 500;
 
 export const STEP_CONCURRENCY = 8;
 
-export const MAX_STEPPED_PER_TICK = 16;
+export const MAX_STEPPED_PER_TICK = 8;
 
 export type StepOutcome = "stepped" | "failed" | "timed out";
 
@@ -40,7 +48,7 @@ export function nextBatch<T>(items: T[], cursor: number, cap: number): Batch<T> 
 }
 
 export function nextAlarmAt(now: number, current: number | null): number | null {
-  if (current !== null && current > now - TICK_MS && current <= now + TICK_MS) return null;
+  if (current !== null && current > now - WATCHDOG_MS && current <= now + WATCHDOG_MS) return null;
 
   return now + TICK_MS;
 }

@@ -145,7 +145,7 @@
       ]
     },
     {
-      "claim": "next alarm set first; 16 creatures per tick, 8 at a time, 600 ms each",
+      "claim": "next alarm set first; 8 creatures per tick at once, rotating, 500 ms each",
       "proof": [
         "src/worker/world.ts alarm()",
         "src/worker/tick.ts:1-7"

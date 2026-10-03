@@ -10,5 +10,5 @@ jobs:
         with:
           submodules: recursive
       - uses: oven-sh/setup-bun@v2
-      - run: npm install -g wrangler@4.82.1
+      - run: npm install -g wrangler@4.110.0
       - run: bun install --frozen-lockfile && bun run verify

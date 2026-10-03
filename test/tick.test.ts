@@ -1,12 +1,22 @@
 import { describe, expect, test } from "bun:test";
-import { nextAlarmAt, nextBatch, runSteps, StepTimeout, TICK_MS, withTimeout } from "../src/worker/tick";
+import {
+  MIN_TICK_GAP_MS,
+  nextAlarmAt,
+  nextBatch,
+  nextTickDelay,
+  runSteps,
+  StepTimeout,
+  TICK_MS,
+  WATCHDOG_MS,
+  withTimeout,
+} from "../src/worker/tick";
 
 describe("nextAlarmAt", () => {
   test("arms when no alarm exists", () => {
     expect(nextAlarmAt(1000, null)).toBe(1000 + TICK_MS);
   });
-  test("keeps a pending alarm inside the next tick", () => {
-    expect(nextAlarmAt(1000, 1000 + TICK_MS)).toBeNull();
+  test("keeps a pending watchdog alarm", () => {
+    expect(nextAlarmAt(1000, 1000 + WATCHDOG_MS)).toBeNull();
   });
   test("re-arms a stale alarm far in the past", () => {
     expect(nextAlarmAt(100_000, 1000)).toBe(100_000 + TICK_MS);
@@ -84,4 +94,13 @@ test("runSteps never runs more than the concurrency limit at once", async () => 
   );
 
   expect(peak).toBe(8);
+});
+
+describe("nextTickDelay", () => {
+  test("subtracts the time the tick took", () => {
+    expect(nextTickDelay(0, 400)).toBe(TICK_MS - 400);
+  });
+  test("never waits less than the minimum gap after an overrun", () => {
+    expect(nextTickDelay(0, TICK_MS * 3)).toBe(MIN_TICK_GAP_MS);
+  });
 });

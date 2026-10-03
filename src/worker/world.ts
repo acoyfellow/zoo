@@ -33,7 +33,7 @@ import {
   type WorldMessage,
 } from "./schema";
 import { STARTERS } from "./starters";
-import { MAX_STEPPED_PER_TICK, nextAlarmAt, nextBatch, runSteps, TICK_MS } from "./tick";
+import { MAX_STEPPED_PER_TICK, nextAlarmAt, nextBatch, nextTickDelay, runSteps, TICK_MS, WATCHDOG_MS } from "./tick";
 
 const MAX_ALIVE = 200;
 
@@ -62,6 +62,7 @@ export class World extends DurableObject<Env> {
   private encounters: EncounterView[] = [];
   private eggs = new Map<string, EggView>();
   private stepCursor = 0;
+  private loopTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -143,6 +144,7 @@ export class World extends DurableObject<Env> {
     const next = nextAlarmAt(Date.now(), await this.ctx.storage.getAlarm());
 
     if (next !== null) await this.ctx.storage.setAlarm(next);
+    this.startLoop();
   }
 
   private liveEggs(): EggView[] {
@@ -421,19 +423,57 @@ export class World extends DurableObject<Env> {
   }
 
   override async alarm(): Promise<void> {
-    if (this.rows().length > 0 || this.ctx.getWebSockets().length > 0)
-      await this.ctx.storage.setAlarm(Date.now() + TICK_MS);
+    if (!this.shouldRun()) return;
+    await this.ctx.storage.setAlarm(Date.now() + WATCHDOG_MS);
+    this.startLoop();
+  }
+
+  private shouldRun(): boolean {
+    return this.rows().length > 0 || this.ctx.getWebSockets().length > 0;
+  }
+
+  private startLoop(): void {
+    if (this.loopTimer !== null) return;
+    this.scheduleTick(0);
+  }
+
+  private scheduleTick(delay: number): void {
+    this.loopTimer = setTimeout(() => void this.loopTick(), delay);
+  }
+
+  private async loopTick(): Promise<void> {
+    const startedAt = Date.now();
 
     try {
       await this.tick();
     } catch (error) {
       console.error("tick failed", String(error));
     }
+
+    if (!this.shouldRun()) {
+      this.loopTimer = null;
+
+      return;
+    }
+
+    this.scheduleTick(nextTickDelay(startedAt, Date.now()));
+  }
+
+  private broadcastSnapshot(rows: Row[]): void {
+    this.broadcast({
+      type: "snapshot",
+      creatures: rows.map((r) => this.view(r)),
+      events: [],
+      encounters: [],
+      eggs: [],
+    });
   }
 
   private async tick(): Promise<void> {
+    const startedAt = Date.now();
     this.tickCount += 1;
     const before = this.rows();
+    this.broadcastSnapshot(before);
     const { batch, cursor } = nextBatch(before, this.stepCursor, MAX_STEPPED_PER_TICK);
     this.stepCursor = cursor;
     await runSteps(
@@ -445,16 +485,12 @@ export class World extends DurableObject<Env> {
 
     for (const row of this.rows().filter((r) => r.energy <= 0)) await this.fade(row, "ran out of energy");
     this.spreadOut();
-    this.broadcast({
-      type: "snapshot",
-      creatures: this.rows().map((r) => this.view(r)),
-      events: [],
-      encounters: [],
-      eggs: [],
-    });
     this.findEncounter(this.rows());
 
     if (this.ctx.getWebSockets().length > 0) this.ctx.waitUntil(this.topUpStarters().catch(() => undefined));
+    const elapsed = Date.now() - startedAt;
+
+    if (elapsed > TICK_MS) console.error("tick overran", elapsed, before.length);
   }
 
   private spreadOut(): void {
