@@ -220,8 +220,25 @@ export class World extends DurableObject<Env> {
     return wanted;
   }
 
-  private async topUpStarters(): Promise<void> {
-    for (const legacy of this.rows().filter((row) => row.family === "")) await this.fade(legacy, "the world was reset");
+  private toppingUp: Promise<void> | null = null;
+
+  private topUpStarters(): Promise<void> {
+    this.toppingUp ??= this.seedStarters().finally(() => (this.toppingUp = null));
+
+    return this.toppingUp;
+  }
+
+  private async seedStarters(): Promise<void> {
+    const founders = new Set<string>();
+
+    for (const row of this.rows()) {
+      const duplicate = row.generation === 0 && STARTERS.some((s) => s.name === row.name) && founders.has(row.name);
+
+      if (row.family === "" || duplicate) await this.fade(row, "the world was reset");
+
+      if (row.generation === 0) founders.add(row.name);
+    }
+
     const alive = this.rows();
     const room = MAX_ALIVE - alive.length;
     const absent = STARTERS.filter((starter) => !alive.some((row) => row.family === starter.name));

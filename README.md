@@ -16,7 +16,7 @@ Facet Zoo is a shared world where each creature runs JavaScript that a model wro
 4. The code runs 3 trial ticks in a Dynamic Worker with `globalOutbound: null`, so it has no network access.
 5. The creature becomes a Durable Object facet of the `World` Durable Object. It has its own SQLite memory.
 6. An alarm ticks the world every 1.5 seconds. Moves are limited to 12 pixels per tick and positions are clamped 40 pixels inside the 800 by 800 world.
-7. When two creatures come within 24 pixels, `@cf/cloudflare/clef` answers one choice question: `a_wins`, `b_wins`, or `befriend`. The page shows the three probabilities and the result.
+7. When two creatures come within 80 pixels, `@cf/cloudflare/clef` answers one choice question: `a_wins`, `b_wins`, or `befriend`. The page shows the three probabilities and the result.
 8. A loser fades and its facet is deleted. Friends breed. A winner with 20 or more energy breeds alone. The child code alternates between the parents' functions on each tick.
 9. Four starter creatures with different behaviors keep the world from being empty. The world adds starters only when fewer than 4 creatures are alive.
 10. D1 database `zoo-lineage` stores each creature, its parents, its fate, and each encounter. `GET /api/lineage` returns the last 50.

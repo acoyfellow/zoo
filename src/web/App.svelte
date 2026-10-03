@@ -314,10 +314,10 @@ onMount(() => {
     <section aria-labelledby="encounters-title" class="flex flex-col gap-2">
       <h2 id="encounters-title" class="text-sm text-emerald-300">Encounters</h2>
       {#if encounters.length === 0}
-        <p class="text-xs text-emerald-500">No encounter yet. Creatures meet when they come within 24 pixels.</p>
+        <p class="text-xs text-emerald-500">No encounter yet. Creatures meet when they come within 80 pixels.</p>
       {:else}
         <ol class="flex flex-col gap-2">
-          {#each [...encounters].reverse() as encounter (encounter.at + encounter.a + encounter.b)}
+          {#each [...encounters].reverse() as encounter, index (`${index}:${encounter.at}`)}
             <li class="rounded-lg border border-emerald-900 bg-black/40 p-2 text-xs">
               <p class="text-emerald-200">{encounter.a} met {encounter.b}</p>
               <dl class="mt-1 grid grid-cols-3 gap-1 text-emerald-400">
@@ -339,7 +339,7 @@ onMount(() => {
         <p class="text-xs text-emerald-500">No events yet.</p>
       {:else}
         <ol class="flex flex-col gap-1 text-xs overflow-auto max-h-48">
-          {#each [...events].reverse() as event (event.at + event.text)}
+          {#each [...events].reverse() as event, index (`${index}:${event.at}`)}
             <li class="text-emerald-300/80">{event.text}</li>
           {/each}
         </ol>
