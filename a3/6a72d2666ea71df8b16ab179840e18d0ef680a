@@ -1,0 +1,23 @@
+.guardrailignore
+  s_fc002e6ac2c2f5::t_ac009310748b41 1
+README.md
+  s_fc002e6ac2c2f5::t_0c56c612972141 3,7-8,44-46
+package.json
+  s_fc002e6ac2c2f5::t_285a7fe5b35661 32-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "a36a72d2666ea71df8b16ab179840e18d0ef680a",
+  "prompts": {},
+  "sessions": {
+    "s_fc002e6ac2c2f5": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0aab9-f490-72e1-8d73-920246e8faec",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Jordan Coeyman <coeyman@gmail.com>"
+    }
+  }
+}
