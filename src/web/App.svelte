@@ -1,5 +1,6 @@
 <script lang="ts">
 import { onMount } from "svelte";
+import Inspector from "./Inspector.svelte";
 import {
   type Creature,
   type Egg,
@@ -44,6 +45,8 @@ let soundOn = $state(false);
 let myEgg = $state<Egg | null>(null);
 
 let lastDescription = $state("");
+
+let inspected = $state<string | null>(null);
 
 const eggStageText = $derived(myEgg ? STAGE_LABELS[myEgg.stage] : "");
 
@@ -217,6 +220,10 @@ onMount(() => {
   if (canvas) {
     renderer = new WorldRenderer(canvas);
     renderer.start();
+    renderer.onSelect = (id) => {
+      inspected = id;
+    };
+
     const benchCount = Number(new URLSearchParams(location.search).get("bench") ?? 0);
 
     if (benchCount > 0) setInterval(() => renderer?.bench(benchCount), 1500);
@@ -252,7 +259,7 @@ onMount(() => {
       ></canvas>
     </div>
     <div class="flex flex-wrap items-center justify-center gap-3 text-xs text-emerald-400">
-      <span>Drag to pan. Pinch or scroll to zoom. Double-tap a creature to follow it.</span>
+      <span>Drag to pan. Pinch or scroll to zoom. Tap a creature to inspect it. Double-tap to follow it.</span>
       <button
         type="button"
         onclick={toggleSound}
@@ -363,7 +370,11 @@ onMount(() => {
         <ol class="flex flex-col gap-1 text-xs overflow-auto max-h-64">
           {#each lineage.slice(0, 20) as creature (creature.id)}
             <li class="text-emerald-300/90">
-              <span class="text-emerald-100">{creature.name}</span>: {parentsOf(creature)}, {creature.fate ?? "alive"}
+              {#if creatures.some((c) => c.id === creature.id)}
+                <button type="button" class="text-emerald-100 underline focus-visible:outline-2 focus-visible:outline-emerald-300" onclick={() => (inspected = creature.id)}>{creature.name}</button>
+              {:else}
+                <span class="text-emerald-100">{creature.name}</span>
+              {/if}: {parentsOf(creature)}, {creature.fate ?? "alive"}
             </li>
           {/each}
         </ol>
@@ -371,3 +382,6 @@ onMount(() => {
     </section>
   </aside>
 </main>
+{#if inspected}
+  <Inspector id={inspected} onclose={() => (inspected = null)} />
+{/if}

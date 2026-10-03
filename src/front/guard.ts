@@ -4,8 +4,10 @@ export type ApiLimits = {
   READ_LIMIT: RateLimit;
 };
 
-function limiterFor(limits: ApiLimits, pathname: string): RateLimit {
+function limiterFor(limits: ApiLimits, pathname: string, method: string): RateLimit {
   if (pathname === "/api/creatures") return limits.SPAWN_LIMIT;
+
+  if (pathname.startsWith("/api/creature/") && method === "POST") return limits.SPAWN_LIMIT;
 
   if (pathname === "/api/encounter") return limits.ENCOUNTER_LIMIT;
 
@@ -15,7 +17,9 @@ function limiterFor(limits: ApiLimits, pathname: string): RateLimit {
 export async function isWithinLimit(request: Request, limits: ApiLimits): Promise<boolean> {
   const { pathname } = new URL(request.url);
   const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
-  const { success } = await limiterFor(limits, pathname).limit({ key: `${pathname}:${ip}` });
+  const limiter = limiterFor(limits, pathname, request.method);
+  const bucket = limiter === limits.SPAWN_LIMIT ? "/api/write" : pathname;
+  const { success } = await limiter.limit({ key: `${bucket}:${ip}` });
 
   return success;
 }

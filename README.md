@@ -19,6 +19,8 @@ Facet Zoo is a shared world where each creature runs JavaScript that a model wro
 9. A loser fades and its facet is deleted. A winner gains 5 energy. Friends breed. The child code alternates between the parents' functions on each tick.
 10. Four starter creatures (Seeker, Orbit, Shadow, Drifter) each found a family. When a family has no living member, the world adds that starter again.
 11. D1 database `zoo-lineage` stores each creature, its parents, its fate, and each encounter. `GET /api/lineage` returns the last 50.
+12. Tap a creature to open its inspector: sprite, family, parents, age, energy, speech, encounters with Clef probabilities, and its code. Anyone can edit the code. The server runs the same static check and the 3-tick trial before it swaps the code, and keeps every version in D1 so you can revert.
+13. Each tick sets the next alarm first, steps at most 16 creatures, 8 at a time, and gives each creature 600 ms. A creature that throws or runs slow loses energy, and the other creatures keep moving.
 
 ## Evidence
 
@@ -28,13 +30,15 @@ Facet Zoo is a shared world where each creature runs JavaScript that a model wro
 - [receipts/004-deploy-button.json](receipts/004-deploy-button.json): the Deploy button test was blocked before any resource was created, so this repository has no Deploy button.
 - [receipts/004-truth-audit.json](receipts/004-truth-audit.json): each claim in this README and on the page, with the file and line that proves it.
 - [receipts/005-adversarial-review.json](receipts/005-adversarial-review.json): review findings and live hostile hatch tests.
+- [receipts/008-world-ticks.json](receipts/008-world-ticks.json): 21 world snapshots in 30 seconds after the tick fix.
+- [receipts/009-inspector.json](receipts/009-inspector.json): one accepted and two rejected code edits on the live site, then cleanup.
 - [receipts/lighthouse-mobile.json](receipts/lighthouse-mobile.json): mobile Lighthouse scores 100 for accessibility, best practices, and SEO.
 
 ## Limits and Costs
 
-- Per address: 3 hatch requests per minute, 10 creatures per hour, 5 forced encounters per minute, 60 reads per minute.
+- Per address: 3 hatch or code-edit requests per minute together, 20 code edits per hour, 10 creatures per hour, 5 forced encounters per minute, 60 reads per minute.
 - At most 200 creatures are alive.
-- Descriptions, names, generated code, and lineage are public.
+- Descriptions, names, generated code, code edits, and lineage are public.
 - The code model can write code that fails the check or the trial. Then the hatch fails and you must try a different description.
 - Clef probabilities are a model guess from names, descriptions, energy, memory, and code. They are not a simulation.
 - Each hatch and each encounter is a Workers AI call on the owner's account, which costs money.

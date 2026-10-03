@@ -136,3 +136,13 @@ export const SpawnResponse = z.object({
   name: z.string(),
   code: z.string(),
 });
+
+export const Speech = z.object({ at: z.number(), text: z.string() });
+
+export type Speech = z.infer<typeof Speech>;
+
+export type CreatureDetail = CreatureView & { code: string; version: number; family: string; speech: Speech[] };
+
+export const CodeEdit = z.object({ code: z.string().min(1).max(8000) });
+
+export const RevertRequest = z.object({ version: z.number().int().min(1) });

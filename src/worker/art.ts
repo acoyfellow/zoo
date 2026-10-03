@@ -14,8 +14,6 @@ export const FLOOR_PROMPT =
 
 export const SPRITE_NEGATIVE = "text, background scenery, frame, border, multiple creatures";
 
-const GATEWAY = { gateway: { id: "default" } };
-
 const ImageOutput = z.object({ image: z.string().min(100) });
 
 const SafetyOutput = z.object({
@@ -58,24 +56,20 @@ export function isSafeEnough(score: number): boolean {
 }
 
 export async function safetyScore(ai: Ai, description: string): Promise<number> {
-  const output = await ai.run(
-    JUDGE_MODEL,
-    {
-      model: "clef",
-      state: { description },
-      questions: {
-        safe: {
-          type: "choice",
-          instructions: "Is this description safe to draw for a general audience?",
-          criteria: {
-            safe: "suitable to draw for all ages",
-            unsafe: "sexual, gory, hateful, or otherwise unsuitable to draw for a general audience",
-          },
+  const output = await ai.run(JUDGE_MODEL, {
+    model: "clef",
+    state: { description },
+    questions: {
+      safe: {
+        type: "choice",
+        instructions: "Is this description safe to draw for a general audience?",
+        criteria: {
+          safe: "suitable to draw for all ages",
+          unsafe: "sexual, gory, hateful, or otherwise unsuitable to draw for a general audience",
         },
       },
     },
-    GATEWAY,
-  );
+  });
 
   return SafetyOutput.parse(output).answers.safe.probabilities.safe ?? 0;
 }
@@ -85,7 +79,7 @@ function decodeBase64(text: string): Uint8Array {
 }
 
 export async function drawImage(ai: Ai, prompt: string): Promise<Uint8Array> {
-  const output = await ai.run(IMAGE_MODEL, { prompt: `${prompt}. Avoid: ${SPRITE_NEGATIVE}`, steps: 4 }, GATEWAY);
+  const output = await ai.run(IMAGE_MODEL, { prompt: `${prompt}. Avoid: ${SPRITE_NEGATIVE}`, steps: 4 });
 
   return decodeBase64(ImageOutput.parse(output).image);
 }

@@ -17,6 +17,7 @@ import {
   WORLD_SIZE,
 } from "./behavior";
 import {
+  type CreatureDetail,
   CreatureState,
   type CreatureView,
   type EggPlacement,
@@ -25,14 +26,14 @@ import {
   type EncounterView,
   type NewCreature,
   NewCreature as NewCreatureSchema,
+  Speech,
   SpriteState,
   TickResult,
   type WorldEvent,
   type WorldMessage,
 } from "./schema";
 import { STARTERS } from "./starters";
-
-const TICK_MS = 1500;
+import { MAX_STEPPED_PER_TICK, nextAlarmAt, nextBatch, runSteps, TICK_MS } from "./tick";
 
 const MAX_ALIVE = 200;
 
@@ -48,6 +49,7 @@ const Row = z.object({
   cooldown_until: z.number(),
   sprite: SpriteState,
   family: z.string(),
+  version: z.number(),
 });
 
 type Row = z.infer<typeof Row>;
@@ -59,6 +61,7 @@ export class World extends DurableObject<Env> {
   private events: WorldEvent[] = [];
   private encounters: EncounterView[] = [];
   private eggs = new Map<string, EggView>();
+  private stepCursor = 0;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -74,6 +77,11 @@ export class World extends DurableObject<Env> {
 
     if (!columns.some((column) => column.name === "family"))
       ctx.storage.sql.exec("ALTER TABLE creatures ADD COLUMN family TEXT NOT NULL DEFAULT ''");
+
+    if (!columns.some((column) => column.name === "version"))
+      ctx.storage.sql.exec("ALTER TABLE creatures ADD COLUMN version INTEGER NOT NULL DEFAULT 1");
+    ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS speech (
+      creature_id TEXT NOT NULL, at INTEGER NOT NULL, text TEXT NOT NULL)`);
   }
 
   private rows(): Row[] {
@@ -117,13 +125,14 @@ export class World extends DurableObject<Env> {
     this.broadcast({ type: "event", event });
   }
 
-  private facet(row: Pick<Row, "id" | "code">): Fetcher {
+  private facet(row: Pick<Row, "id" | "code" | "version">): Fetcher {
     return this.ctx.facets.get(row.id, async () => {
-      const worker = this.env.LOADER.get(`creature-${row.id}`, () => ({
+      const worker = this.env.LOADER.get(`creature-${row.id}-v${row.version}`, () => ({
         compatibilityDate: "2026-09-04",
         mainModule: "creature.js",
         modules: { "creature.js": creatureModule(row.code) },
         globalOutbound: null,
+        limits: { cpuMs: 50 },
       }));
 
       return { class: worker.getDurableObjectClass("Creature") };
@@ -131,7 +140,9 @@ export class World extends DurableObject<Env> {
   }
 
   private async ensureAlarm(): Promise<void> {
-    if ((await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(Date.now() + TICK_MS);
+    const next = nextAlarmAt(Date.now(), await this.ctx.storage.getAlarm());
+
+    if (next !== null) await this.ctx.storage.setAlarm(next);
   }
 
   private liveEggs(): EggView[] {
@@ -279,14 +290,45 @@ export class World extends DurableObject<Env> {
     }
   }
 
+  async inspect(id: string): Promise<CreatureDetail | null> {
+    const row = this.rows().find((r) => r.id === id);
+
+    if (!row) return null;
+
+    const speech = this.ctx.storage.sql
+      .exec("SELECT at, text FROM speech WHERE creature_id = ? ORDER BY at DESC LIMIT 20", id)
+      .toArray()
+      .map((line) => Speech.parse(line));
+
+    return { ...this.view(row), code: row.code, version: row.version, family: row.family, speech };
+  }
+
+  async replaceCode(id: string, code: string, version: number): Promise<boolean> {
+    const row = this.rows().find((r) => r.id === id);
+
+    if (!row) return false;
+    this.ctx.storage.sql.exec("UPDATE creatures SET code = ?, version = ? WHERE id = ?", code, version, id);
+
+    try {
+      this.ctx.facets.abort(id, new Error("code replaced"));
+    } catch (error) {
+      console.error("facet abort failed", String(error));
+    }
+
+    this.announce(`${row.name} got new code (version ${version})`);
+
+    return true;
+  }
+
   async aliveCount(): Promise<number> {
     return this.rows().length;
   }
 
   override async fetch(request: Request): Promise<Response> {
     if (request.headers.get("Upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });
-    await this.topUpStarters();
-    await this.backfillSprites();
+    await this.ensureAlarm();
+    await this.topUpStarters().catch((error) => console.error("top up failed", String(error)));
+    await this.backfillSprites().catch((error) => console.error("backfill failed", String(error)));
     const pair = new WebSocketPair();
     this.ctx.acceptWebSocket(pair[1]);
     pair[1].send(
@@ -298,7 +340,6 @@ export class World extends DurableObject<Env> {
         eggs: this.liveEggs(),
       }),
     );
-    await this.ensureAlarm();
 
     return new Response(null, { status: 101, webSocket: pair[0] });
   }
@@ -327,7 +368,7 @@ export class World extends DurableObject<Env> {
       .slice(0, 5);
   }
 
-  private async stepCreature(row: Row, all: Row[]): Promise<void> {
+  private async tickOf(row: Row, all: Row[]): Promise<TickResult> {
     const view = {
       tick: this.tickCount,
       self: { x: row.x, y: row.y, energy: row.energy },
@@ -335,19 +376,15 @@ export class World extends DurableObject<Env> {
       size: WORLD_SIZE,
     };
 
-    let result: TickResult;
+    const response = await this.facet(row).fetch("https://creature/tick", {
+      method: "POST",
+      body: JSON.stringify(view),
+    });
 
-    try {
-      const response = await this.facet(row).fetch("https://creature/tick", {
-        method: "POST",
-        body: JSON.stringify(view),
-      });
+    return TickResult.parse(await response.json());
+  }
 
-      result = TickResult.parse(await response.json());
-    } catch (error) {
-      result = { ok: false, actions: [], error: String(error) };
-    }
-
+  private applyTick(row: Row, result: TickResult): void {
     let { x, y } = row;
     let said = row.said;
 
@@ -357,6 +394,7 @@ export class World extends DurableObject<Env> {
       if (action.type === "say") said = action.text;
     }
 
+    if (said !== row.said && said !== "") this.recordSpeech(row.id, said);
     const energy = Math.max(0, row.energy - (result.ok ? 0.01 : 0.5));
     this.ctx.storage.sql.exec(
       "UPDATE creatures SET x = ?, y = ?, said = ?, energy = ? WHERE id = ?",
@@ -368,16 +406,45 @@ export class World extends DurableObject<Env> {
     );
   }
 
+  private recordSpeech(id: string, text: string): void {
+    this.ctx.storage.sql.exec("INSERT INTO speech (creature_id, at, text) VALUES (?, ?, ?)", id, Date.now(), text);
+    this.ctx.storage.sql.exec(
+      "DELETE FROM speech WHERE creature_id = ? AND at < (SELECT MIN(at) FROM (SELECT at FROM speech WHERE creature_id = ? ORDER BY at DESC LIMIT 20))",
+      id,
+      id,
+    );
+  }
+
+  private penalize(row: Row, error: string): void {
+    console.error("creature step failed", row.id, error.slice(0, 200));
+    this.ctx.storage.sql.exec("UPDATE creatures SET energy = MAX(0, energy - 0.5) WHERE id = ?", row.id);
+  }
+
   override async alarm(): Promise<void> {
+    if (this.rows().length > 0 || this.ctx.getWebSockets().length > 0)
+      await this.ctx.storage.setAlarm(Date.now() + TICK_MS);
+
+    try {
+      await this.tick();
+    } catch (error) {
+      console.error("tick failed", String(error));
+    }
+  }
+
+  private async tick(): Promise<void> {
     this.tickCount += 1;
     const before = this.rows();
-    await Promise.all(before.map((row) => this.stepCreature(row, before)));
-    const after = this.rows();
+    const { batch, cursor } = nextBatch(before, this.stepCursor, MAX_STEPPED_PER_TICK);
+    this.stepCursor = cursor;
+    await runSteps(
+      batch,
+      (row) => this.tickOf(row, before),
+      (row, result) => this.applyTick(row, result),
+      (row, _outcome, error) => this.penalize(row, error),
+    );
 
-    for (const row of after.filter((r) => r.energy <= 0)) await this.fade(row, "ran out of energy");
+    for (const row of this.rows().filter((r) => r.energy <= 0)) await this.fade(row, "ran out of energy");
     this.spreadOut();
-
-    if (this.ctx.getWebSockets().length > 0) await this.topUpStarters();
     this.broadcast({
       type: "snapshot",
       creatures: this.rows().map((r) => this.view(r)),
@@ -387,8 +454,7 @@ export class World extends DurableObject<Env> {
     });
     this.findEncounter(this.rows());
 
-    if (this.rows().length > 0 || this.ctx.getWebSockets().length > 0)
-      await this.ctx.storage.setAlarm(Date.now() + TICK_MS);
+    if (this.ctx.getWebSockets().length > 0) this.ctx.waitUntil(this.topUpStarters().catch(() => undefined));
   }
 
   private spreadOut(): void {
@@ -504,6 +570,7 @@ export class World extends DurableObject<Env> {
 
   private async fade(row: Row, reason: string): Promise<void> {
     this.ctx.storage.sql.exec("DELETE FROM creatures WHERE id = ?", row.id);
+    this.ctx.storage.sql.exec("DELETE FROM speech WHERE creature_id = ?", row.id);
 
     try {
       this.ctx.facets.delete(row.id);

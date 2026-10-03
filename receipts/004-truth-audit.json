@@ -3,45 +3,258 @@
   "step": "004-truth-audit",
   "rule": "Every factual sentence maps to a file:line. Unproven sentences were rewritten or cut.",
   "readme": [
-    {"claim": "description of 3 to 400 characters", "proof": "src/worker/schema.ts:12"},
-    {"claim": "Cloudflare Clef @cf/cloudflare/clef scores safety; below 0.7 refused", "proof": ["src/worker/ai.ts:6", "src/worker/art.ts:6", "src/worker/art.ts:60", "src/worker/index.ts:76-82"]},
-    {"claim": "Moonshot AI Kimi @cf/moonshotai/kimi-k2.7-code writes behave(api, view) with move, say, remember, recall", "proof": ["src/worker/ai.ts:4", "src/worker/behavior.ts:5", "src/worker/behavior.ts:96-108"]},
-    {"claim": "static check rejects fetch, eval, import, while", "proof": "src/worker/behavior.ts:7-20,51"},
-    {"claim": "3 trial ticks in a Dynamic Worker with globalOutbound null", "proof": ["src/worker/behavior.ts:135", "src/worker/index.ts:26-37"]},
-    {"claim": "creature is a facet of World with its own SQLite memory", "proof": ["src/worker/world.ts:120-131", "src/worker/behavior.ts:83"]},
-    {"claim": "Black Forest Labs FLUX.1 [schnell] draws the sprite; all three models on Workers AI", "proof": ["src/worker/art.ts:4", "src/worker/art.ts:87-91", "core/wrangler.prod.jsonc:8"]},
-    {"claim": "tick every 1.5 s, 12 px per tick, clamp 40 px inside 800x800", "proof": ["src/worker/world.ts:35", "src/worker/behavior.ts:169", "src/worker/behavior.ts:151", "src/worker/behavior.ts:1"]},
-    {"claim": "within 80 px Clef picks a_wins, b_wins or befriend", "proof": ["src/worker/behavior.ts:250", "src/worker/ai.ts:99-110"]},
-    {"claim": "loser fades and facet deleted, winner +5 energy, friends breed, child alternates parent code per tick", "proof": ["src/worker/world.ts:469-476", "src/worker/world.ts:509", "src/worker/world.ts:521", "src/worker/behavior.ts:64-75"]},
-    {"claim": "four starters Seeker, Orbit, Shadow, Drifter; re-added when family has no living member", "proof": ["src/worker/starters.ts:5,14,24,37", "src/worker/world.ts:244"]},
-    {"claim": "D1 zoo-lineage; GET /api/lineage returns last 50", "proof": ["core/wrangler.prod.jsonc", "src/worker/index.ts:105-113"]},
-    {"claim": "rate limits 3 hatch/min, 5 encounters/min, 60 reads/min; 10 per hour; 200 alive", "proof": ["wrangler.prod.jsonc:12-14", "src/worker/index.ts:9", "src/worker/index.ts:11"]},
-    {"claim": "POST /api/encounter forces a meeting, rate limit only", "proof": ["src/worker/index.ts:135-137", "src/front/guard.ts:10"]},
-    {"claim": "observability on for both Workers; log lines 'clef judge failed', 'sprite failed'", "proof": ["core/wrangler.prod.jsonc:15", "wrangler.prod.jsonc:17", "src/worker/world.ts:461", "src/worker/world.ts:175"]},
-    {"claim": "sprite tries twice then glyph", "proof": ["src/worker/art.ts:8", "src/worker/world.ts:173"]},
-    {"claim": "Clef context is trimmed by compactFighter", "proof": "src/worker/ai.ts:70-85"},
-    {"claim": "front adds security headers", "proof": ["src/front/headers.ts", "src/front/index.ts"]},
-    {"claim": "verify runs tsc, svelte-check, biome, oxlint, copy-check, bun test", "proof": "package.json scripts.verify"}
+    {
+      "claim": "description of 3 to 400 characters",
+      "proof": "src/worker/schema.ts:12"
+    },
+    {
+      "claim": "Cloudflare Clef @cf/cloudflare/clef scores safety; below 0.7 refused",
+      "proof": [
+        "src/worker/ai.ts:6",
+        "src/worker/art.ts:6",
+        "src/worker/art.ts:60",
+        "src/worker/index.ts:76-82"
+      ]
+    },
+    {
+      "claim": "Moonshot AI Kimi @cf/moonshotai/kimi-k2.7-code writes behave(api, view) with move, say, remember, recall",
+      "proof": [
+        "src/worker/ai.ts:4",
+        "src/worker/behavior.ts:5",
+        "src/worker/behavior.ts:96-108"
+      ]
+    },
+    {
+      "claim": "static check rejects fetch, eval, import, while",
+      "proof": "src/worker/behavior.ts:7-20,51"
+    },
+    {
+      "claim": "3 trial ticks in a Dynamic Worker with globalOutbound null",
+      "proof": [
+        "src/worker/behavior.ts:135",
+        "src/worker/index.ts:26-37"
+      ]
+    },
+    {
+      "claim": "creature is a facet of World with its own SQLite memory",
+      "proof": [
+        "src/worker/world.ts:120-131",
+        "src/worker/behavior.ts:83"
+      ]
+    },
+    {
+      "claim": "Black Forest Labs FLUX.1 [schnell] draws the sprite; all three models on Workers AI",
+      "proof": [
+        "src/worker/art.ts:4",
+        "src/worker/art.ts:87-91",
+        "core/wrangler.prod.jsonc:8"
+      ]
+    },
+    {
+      "claim": "tick every 1.5 s, 12 px per tick, clamp 40 px inside 800x800",
+      "proof": [
+        "src/worker/world.ts:35",
+        "src/worker/behavior.ts:169",
+        "src/worker/behavior.ts:151",
+        "src/worker/behavior.ts:1"
+      ]
+    },
+    {
+      "claim": "within 80 px Clef picks a_wins, b_wins or befriend",
+      "proof": [
+        "src/worker/behavior.ts:250",
+        "src/worker/ai.ts:99-110"
+      ]
+    },
+    {
+      "claim": "loser fades and facet deleted, winner +5 energy, friends breed, child alternates parent code per tick",
+      "proof": [
+        "src/worker/world.ts:469-476",
+        "src/worker/world.ts:509",
+        "src/worker/world.ts:521",
+        "src/worker/behavior.ts:64-75"
+      ]
+    },
+    {
+      "claim": "four starters Seeker, Orbit, Shadow, Drifter; re-added when family has no living member",
+      "proof": [
+        "src/worker/starters.ts:5,14,24,37",
+        "src/worker/world.ts:244"
+      ]
+    },
+    {
+      "claim": "D1 zoo-lineage; GET /api/lineage returns last 50",
+      "proof": [
+        "core/wrangler.prod.jsonc",
+        "src/worker/index.ts:105-113"
+      ]
+    },
+    {
+      "claim": "rate limits 3 hatch/min, 5 encounters/min, 60 reads/min; 10 per hour; 200 alive",
+      "proof": [
+        "wrangler.prod.jsonc:12-14",
+        "src/worker/index.ts:9",
+        "src/worker/index.ts:11"
+      ]
+    },
+    {
+      "claim": "POST /api/encounter forces a meeting, rate limit only",
+      "proof": [
+        "src/worker/index.ts:135-137",
+        "src/front/guard.ts:10"
+      ]
+    },
+    {
+      "claim": "observability on for both Workers; log lines 'clef judge failed', 'sprite failed'",
+      "proof": [
+        "core/wrangler.prod.jsonc:15",
+        "wrangler.prod.jsonc:17",
+        "src/worker/world.ts:461",
+        "src/worker/world.ts:175"
+      ]
+    },
+    {
+      "claim": "sprite tries twice then glyph",
+      "proof": [
+        "src/worker/art.ts:8",
+        "src/worker/world.ts:173"
+      ]
+    },
+    {
+      "claim": "Clef context is trimmed by compactFighter",
+      "proof": "src/worker/ai.ts:70-85"
+    },
+    {
+      "claim": "front adds security headers",
+      "proof": [
+        "src/front/headers.ts",
+        "src/front/index.ts"
+      ]
+    },
+    {
+      "claim": "verify runs tsc, svelte-check, biome, oxlint, copy-check, bun test",
+      "proof": "package.json scripts.verify"
+    },
+    {
+      "claim": "inspector shows sprite, family, parents, age, energy, speech, encounters, code; edits pass the static check and 3-tick trial; versions kept for revert",
+      "proof": [
+        "src/web/Inspector.svelte",
+        "src/worker/edit.ts:16",
+        "src/worker/index.ts",
+        "migrations/0002_code_versions.sql"
+      ]
+    },
+    {
+      "claim": "next alarm set first; 16 creatures per tick, 8 at a time, 600 ms each",
+      "proof": [
+        "src/worker/world.ts alarm()",
+        "src/worker/tick.ts:1-7"
+      ]
+    },
+    {
+      "claim": "3 hatch or code-edit requests per minute together, 20 code edits per hour",
+      "proof": [
+        "src/front/guard.ts:10-21",
+        "src/worker/edit.ts:7"
+      ]
+    }
   ],
   "page": [
-    {"claim": "FLUX.1 [schnell] draws, Kimi writes code, own sandbox, Clef picks result, all on Workers AI", "where": "src/web/App.svelte:237-241", "proof": ["src/worker/art.ts:4", "src/worker/ai.ts:4", "src/worker/ai.ts:6", "src/worker/world.ts:126"]},
-    {"claim": "Connection lost, retries every 2 seconds", "where": "src/web/App.svelte", "proof": "src/web/App.svelte:114"},
-    {"claim": "Limits: 3 per minute, 10 per hour, 200 alive; public", "where": "src/web/App.svelte", "proof": ["wrangler.prod.jsonc:12", "src/worker/index.ts:9-11", "src/worker/index.ts:107"]},
-    {"claim": "meet within 80 pixels", "where": "src/web/App.svelte:317", "proof": "src/worker/behavior.ts:250"},
-    {"claim": "judge reads names, descriptions, energy, and code", "where": "src/web/App.svelte:333", "proof": "src/worker/ai.ts:62-85"},
-    {"claim": "Drag, pinch, scroll, double-tap", "where": "src/web/App.svelte:250", "proof": "src/web/world/renderer.ts:1062-1110"}
+    {
+      "claim": "FLUX.1 [schnell] draws, Kimi writes code, own sandbox, Clef picks result, all on Workers AI",
+      "where": "src/web/App.svelte:237-241",
+      "proof": [
+        "src/worker/art.ts:4",
+        "src/worker/ai.ts:4",
+        "src/worker/ai.ts:6",
+        "src/worker/world.ts:126"
+      ]
+    },
+    {
+      "claim": "Connection lost, retries every 2 seconds",
+      "where": "src/web/App.svelte",
+      "proof": "src/web/App.svelte:114"
+    },
+    {
+      "claim": "Limits: 3 per minute, 10 per hour, 200 alive; public",
+      "where": "src/web/App.svelte",
+      "proof": [
+        "wrangler.prod.jsonc:12",
+        "src/worker/index.ts:9-11",
+        "src/worker/index.ts:107"
+      ]
+    },
+    {
+      "claim": "meet within 80 pixels",
+      "where": "src/web/App.svelte:317",
+      "proof": "src/worker/behavior.ts:250"
+    },
+    {
+      "claim": "judge reads names, descriptions, energy, and code",
+      "where": "src/web/App.svelte:333",
+      "proof": "src/worker/ai.ts:62-85"
+    },
+    {
+      "claim": "Drag, pinch, scroll, double-tap",
+      "where": "src/web/App.svelte:250",
+      "proof": "src/web/world/renderer.ts:1062-1110"
+    }
   ],
   "meta": [
-    {"claim": "Describe a creature in one sentence. A model writes its behavior code, a sandbox runs it, and the Clef model judges each meeting.", "where": ["src/web/index.html:7,17,26,30", "src/web/public/manifest.webmanifest:4"], "proof": ["src/worker/ai.ts:4", "src/worker/index.ts:31", "src/worker/ai.ts:6"]},
-    {"claim": "og:image 1200x630", "where": "src/web/index.html:20-22", "proof": "src/web/public/og.jpg"}
+    {
+      "claim": "Describe a creature in one sentence. A model writes its behavior code, a sandbox runs it, and the Clef model judges each meeting.",
+      "where": [
+        "src/web/index.html:7,17,26,30",
+        "src/web/public/manifest.webmanifest:4"
+      ],
+      "proof": [
+        "src/worker/ai.ts:4",
+        "src/worker/index.ts:31",
+        "src/worker/ai.ts:6"
+      ]
+    },
+    {
+      "claim": "og:image 1200x630",
+      "where": "src/web/index.html:20-22",
+      "proof": "src/web/public/og.jpg"
+    }
   ],
-  "github": {"description": "A shared world where each creature runs JavaScript that a model wrote from one sentence.", "proof": ["src/worker/ai.ts:4", "src/worker/world.ts:120-131"]},
+  "github": {
+    "description": "A shared world where each creature runs JavaScript that a model wrote from one sentence.",
+    "proof": [
+      "src/worker/ai.ts:4",
+      "src/worker/world.ts:120-131"
+    ]
+  },
   "rewritten": [
-    {"before": "README Deploy to Cloudflare button", "why": "receipts/004-deploy-button.json shows the button is blocked and no root wrangler.jsonc exists", "action": "cut"},
-    {"before": "A winner with 20 or more energy breeds alone", "why": "no such branch in src/worker/world.ts (self-breeding removed in 40ef737 review)", "action": "replaced with 'A winner gains 5 energy' (world.ts:475)"},
-    {"before": "The world adds starters only when fewer than 4 creatures are alive", "why": "seedStarters re-adds per absent family (world.ts:244)", "action": "rewritten"},
-    {"before": "Self-Host section about root wrangler.jsonc and the Deploy button", "why": "file does not exist", "action": "cut"},
-    {"before": "Front Worker uses wrangler.jsonc; local dev runs wrangler dev on wrangler.jsonc", "why": "only wrangler.prod.jsonc exists", "action": "rewritten"},
-    {"before": "README did not name the image model or the safety check", "action": "added with vendor names"}
+    {
+      "before": "README Deploy to Cloudflare button",
+      "why": "receipts/004-deploy-button.json shows the button is blocked and no root wrangler.jsonc exists",
+      "action": "cut"
+    },
+    {
+      "before": "A winner with 20 or more energy breeds alone",
+      "why": "no such branch in src/worker/world.ts (self-breeding removed in 40ef737 review)",
+      "action": "replaced with 'A winner gains 5 energy' (world.ts:475)"
+    },
+    {
+      "before": "The world adds starters only when fewer than 4 creatures are alive",
+      "why": "seedStarters re-adds per absent family (world.ts:244)",
+      "action": "rewritten"
+    },
+    {
+      "before": "Self-Host section about root wrangler.jsonc and the Deploy button",
+      "why": "file does not exist",
+      "action": "cut"
+    },
+    {
+      "before": "Front Worker uses wrangler.jsonc; local dev runs wrangler dev on wrangler.jsonc",
+      "why": "only wrangler.prod.jsonc exists",
+      "action": "rewritten"
+    },
+    {
+      "before": "README did not name the image model or the safety check",
+      "action": "added with vendor names"
+    }
   ]
 }

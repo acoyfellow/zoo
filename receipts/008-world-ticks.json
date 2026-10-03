@@ -1,0 +1,68 @@
+{
+  "schema": "zoo.receipt.v1",
+  "step": "008-world-ticks",
+  "status": "done",
+  "symptom": "The world WebSocket sent one snapshot and then nothing. wrangler tail showed one alarm (wall 1285 ms, cpu 505 ms) and then a canceled alarm. setAlarm was the last statement of alarm(), so a throw, cancel, or overrun ended the loop.",
+  "root_causes_seen_in_tail": [
+    "Dynamic worker concurrency limit exceeded: each request may have up to 10 concurrent dynamic worker invocations. All creatures were stepped with one Promise.all.",
+    "Some creature steps ran longer than the tick."
+  ],
+  "fix": {
+    "alarm_first": "src/worker/world.ts alarm() calls setAlarm before tick() and catches tick errors",
+    "bounded_work": "src/worker/tick.ts: at most 16 creatures per tick (round-robin cursor), 8 concurrent steps, 600 ms per step via withTimeout, 50 ms CPU limit per Dynamic Worker",
+    "isolation": "runSteps logs and penalizes a failing or slow creature and continues",
+    "rearm_on_connect": "World.fetch calls ensureAlarm before anything else; nextAlarmAt re-arms a stale or far-future alarm"
+  },
+  "tests": "test/tick.test.ts",
+  "proof": {
+    "tool": "headless Chrome via puppeteer-core, CDP Network.webSocketFrameReceived",
+    "script": "/tmp/zshot/ticks.mjs",
+    "before_fix_same_script": {
+      "snapshot_frames": 3
+    },
+    "runs": [
+      {
+        "url": "wss://zoo.coey.dev/api/world",
+        "window_ms": 30000,
+        "snapshot_frames": 21,
+        "frames_with_position_change": 20,
+        "creatures": 11,
+        "sample": {
+          "id": "33922795-b373-4d04-9c9f-baa59abf5e8c",
+          "first": [
+            449.75209152547677,
+            513.0671462705335
+          ],
+          "last": [
+            270.9361903710915,
+            451.14574569254466
+          ]
+        },
+        "measured_at": "2026-10-03T11:47:35.734Z"
+      },
+      {
+        "url": "wss://zoo.coey.dev/api/world",
+        "window_ms": 30000,
+        "snapshot_frames": 21,
+        "frames_with_position_change": 20,
+        "creatures": 11,
+        "sample": {
+          "id": "33922795-b373-4d04-9c9f-baa59abf5e8c",
+          "first": [
+            398.3082991256965,
+            377.46636561694214
+          ],
+          "last": [
+            295.38706725221306,
+            492.7629586847205
+          ]
+        },
+        "measured_at": "2026-10-03T11:48:23.691Z"
+      }
+    ],
+    "gate": "snapshot_frames >= 15 and positions change between frames: passed"
+  },
+  "deploy": {
+    "zoo-core": "49632f97-85cc-4122-9c64-23878039aefc"
+  }
+}

@@ -5,8 +5,6 @@ export const CODE_MODEL = "@cf/moonshotai/kimi-k2.7-code";
 
 export const JUDGE_MODEL = "@cf/cloudflare/clef";
 
-const GATEWAY = { gateway: { id: "default" } };
-
 export const CREATURE_API_PROMPT = `You write behavior modules for tiny glowing creatures in a 800x800 terrarium.
 Output ONLY JavaScript, no prose, no comments. The module must be exactly one function starting with:
 ${BEHAVIOR_HEADER}
@@ -33,21 +31,17 @@ export async function writeBehavior(ai: Ai, description: string): Promise<Valida
   let lastReason = "no attempt";
 
   for (let attempt = 0; attempt < 2; attempt++) {
-    const output = await ai.run(
-      CODE_MODEL,
-      {
-        messages: [
-          { role: "system", content: CREATURE_API_PROMPT },
-          {
-            role: "user",
-            content: `Creature: ${description}${attempt > 0 ? `\nPrevious attempt was rejected: ${lastReason}` : ""}`,
-          },
-        ],
-        max_tokens: 4000,
-        temperature: 0.4,
-      },
-      GATEWAY,
-    );
+    const output = await ai.run(CODE_MODEL, {
+      messages: [
+        { role: "system", content: CREATURE_API_PROMPT },
+        {
+          role: "user",
+          content: `Creature: ${description}${attempt > 0 ? `\nPrevious attempt was rejected: ${lastReason}` : ""}`,
+        },
+      ],
+      max_tokens: 4000,
+      temperature: 0.4,
+    });
 
     const text = textOf(ModelOutput.safeParse(output));
     const result = validateBehavior(text);
@@ -92,26 +86,22 @@ export function parseVerdict(body: string): Verdict {
 }
 
 export async function judgeEncounter(ai: Ai, a: Fighter, b: Fighter): Promise<Verdict> {
-  const output = await ai.run(
-    JUDGE_MODEL,
-    {
-      model: "clef",
-      state: { creature_a: compactFighter(a), creature_b: compactFighter(b) },
-      questions: {
-        outcome: {
-          type: "choice",
-          instructions:
-            "Two small creatures meet in a terrarium. Based on their descriptions, energy, memories and behavior code, decide what happens.",
-          criteria: {
-            a_wins: "creature_a overpowers or outwits creature_b",
-            b_wins: "creature_b overpowers or outwits creature_a",
-            befriend: "they are compatible and become friends",
-          },
+  const output = await ai.run(JUDGE_MODEL, {
+    model: "clef",
+    state: { creature_a: compactFighter(a), creature_b: compactFighter(b) },
+    questions: {
+      outcome: {
+        type: "choice",
+        instructions:
+          "Two small creatures meet in a terrarium. Based on their descriptions, energy, memories and behavior code, decide what happens.",
+        criteria: {
+          a_wins: "creature_a overpowers or outwits creature_b",
+          b_wins: "creature_b overpowers or outwits creature_a",
+          befriend: "they are compatible and become friends",
         },
       },
     },
-    GATEWAY,
-  );
+  });
 
   return ClefOutputSchema.parse(output).answers.outcome;
 }

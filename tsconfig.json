@@ -16,6 +16,7 @@
     "src/worker",
     "src/front",
     "src/web/world/math.ts",
+    "src/web/highlight.ts",
     "test",
     "worker-configuration.d.ts",
     "src/standalone.ts"

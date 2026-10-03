@@ -89,3 +89,46 @@ export const SpawnReply = z.union([
   z.object({ id: z.string(), name: z.string(), code: z.string() }),
   z.object({ error: z.string() }),
 ]);
+
+export const InspectorReply = z.object({
+  id: z.string(),
+  name: z.string(),
+  energy: z.number(),
+  said: z.string(),
+  generation: z.number(),
+  sprite: SpriteState.catch("pending"),
+  code: z.string(),
+  version: z.number(),
+  family: z.string(),
+  speech: z.array(z.object({ at: z.number(), text: z.string() })),
+  record: z
+    .object({
+      description: z.string().nullable().catch(null),
+      created_at: z.number(),
+      parent_a_name: z.string().nullable().catch(null),
+      parent_b_name: z.string().nullable().catch(null),
+    })
+    .nullable()
+    .catch(null),
+  encounters: z.array(
+    z.object({
+      a_id: z.string(),
+      b_id: z.string(),
+      a_name: z.string().nullable().catch(null),
+      b_name: z.string().nullable().catch(null),
+      outcome: z.string(),
+      probabilities: z.string(),
+      created_at: z.number(),
+    }),
+  ),
+  versions: z.array(z.object({ version: z.number(), code: z.string(), source: z.string(), created_at: z.number() })),
+});
+
+export type Inspection = z.infer<typeof InspectorReply>;
+
+export const Probabilities = z.record(z.string(), z.number()).catch({});
+
+export const EditReply = z.union([
+  z.object({ ok: z.literal(true), version: z.number() }),
+  z.object({ error: z.string() }),
+]);

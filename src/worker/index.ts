@@ -2,7 +2,8 @@ import { z } from "zod";
 import { CODE_MODEL, writeBehavior } from "./ai";
 import { FLOOR_KEY, isSafeEnough, SAFETY_THRESHOLD, safetyScore, serveObject, smallSpriteKey, spriteKey } from "./art";
 import { nameFrom, trialModule, type ValidationResult } from "./behavior";
-import { type EggStage, SpawnRequest, TickResult } from "./schema";
+import { checkEdit, MAX_EDITS_PER_IP_PER_HOUR } from "./edit";
+import { CodeEdit, type EggStage, RevertRequest, SpawnRequest, TickResult } from "./schema";
 
 export { World } from "./world";
 
@@ -29,6 +30,7 @@ async function trial(env: Env, code: string): Promise<TickResult> {
     mainModule: "trial.js",
     modules: { "trial.js": trialModule(code) },
     globalOutbound: null,
+    limits: { cpuMs: 50 },
   });
 
   const response = await worker.getEntrypoint().fetch("https://trial/");
@@ -73,7 +75,12 @@ async function spawn(request: Request, env: Env): Promise<Response> {
       { status: 429 },
     );
   await stage("safety");
-  const safety = await safetyScore(env.AI, description).catch(() => 0);
+
+  const safety = await safetyScore(env.AI, description).catch((error) => {
+    console.error("safety check failed", String(error).slice(0, 300));
+
+    return 0;
+  });
 
   if (!isSafeEnough(safety))
     return fail(
@@ -112,6 +119,129 @@ async function lineage(env: Env): Promise<Response> {
   return Response.json({ creatures: creatures.results, encounters: encounters.results });
 }
 
+const VersionRow = z.object({ version: z.number(), code: z.string(), source: z.string(), created_at: z.number() });
+
+async function versionsOf(env: Env, id: string): Promise<z.infer<typeof VersionRow>[]> {
+  const rows = await env.DB.prepare(
+    "SELECT version, code, source, created_at FROM code_versions WHERE creature_id = ? ORDER BY version DESC LIMIT 50",
+  )
+    .bind(id)
+    .all();
+
+  return rows.results.map((row) => VersionRow.parse(row));
+}
+
+async function inspect(env: Env, id: string): Promise<Response> {
+  const live = await world(env).inspect(id);
+
+  if (!live) return Response.json({ error: "No living creature has this id." }, { status: 404 });
+
+  const record = await env.DB.prepare(
+    "SELECT c.description, c.created_at, c.parent_a, c.parent_b, a.name AS parent_a_name, b.name AS parent_b_name FROM creatures c LEFT JOIN creatures a ON a.id = c.parent_a LEFT JOIN creatures b ON b.id = c.parent_b WHERE c.id = ?",
+  )
+    .bind(id)
+    .first();
+
+  const encounters = await env.DB.prepare(
+    "SELECT e.a_id, e.b_id, e.outcome, e.probabilities, e.created_at, a.name AS a_name, b.name AS b_name FROM encounters e LEFT JOIN creatures a ON a.id = e.a_id LEFT JOIN creatures b ON b.id = e.b_id WHERE e.a_id = ? OR e.b_id = ? ORDER BY e.created_at DESC LIMIT 20",
+  )
+    .bind(id, id)
+    .all();
+
+  return Response.json({ ...live, record, encounters: encounters.results, versions: await versionsOf(env, id) });
+}
+
+async function editsInLastHour(env: Env, ipHash: string): Promise<number> {
+  return z.number().parse(
+    await env.DB.prepare("SELECT COUNT(*) AS n FROM code_versions WHERE ip_hash = ? AND created_at > ?")
+      .bind(ipHash, Date.now() - 3600_000)
+      .first("n"),
+  );
+}
+
+async function saveVersion(env: Env, id: string, code: string, source: string, ipHash: string): Promise<Response> {
+  const live = await world(env).inspect(id);
+
+  if (!live) return Response.json({ error: "No living creature has this id." }, { status: 404 });
+
+  if (live.version === 1)
+    await env.DB.prepare(
+      "INSERT OR IGNORE INTO code_versions (creature_id, version, code, source, ip_hash, created_at) VALUES (?, 1, ?, 'original', 'original', ?)",
+    )
+      .bind(id, live.code, Date.now())
+      .run();
+
+  const latest = z
+    .number()
+    .parse(
+      await env.DB.prepare("SELECT COALESCE(MAX(version), 1) AS v FROM code_versions WHERE creature_id = ?")
+        .bind(id)
+        .first("v"),
+    );
+
+  const version = latest + 1;
+  await env.DB.prepare(
+    "INSERT INTO code_versions (creature_id, version, code, source, ip_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+  )
+    .bind(id, version, code, source, ipHash, Date.now())
+    .run();
+  await env.DB.prepare("UPDATE creatures SET code = ? WHERE id = ?").bind(code, id).run();
+  await world(env).replaceCode(id, code, version);
+
+  return Response.json({ ok: true, version, code, versions: await versionsOf(env, id) });
+}
+
+async function limitedIp(request: Request, env: Env): Promise<{ ipHash: string; limited: boolean }> {
+  const ipHash = await hashIp(request.headers.get("CF-Connecting-IP") ?? "unknown");
+
+  return { ipHash, limited: (await editsInLastHour(env, ipHash)) >= MAX_EDITS_PER_IP_PER_HOUR };
+}
+
+const LIMITED = { error: `Limit reached: ${MAX_EDITS_PER_IP_PER_HOUR} code edits per hour from one address.` };
+
+async function editCode(request: Request, env: Env, id: string): Promise<Response> {
+  const body = CodeEdit.safeParse(await request.json().catch(() => null));
+
+  if (!body.success) return Response.json({ error: "Send code as a string of 1 to 8000 characters." }, { status: 400 });
+  const { ipHash, limited } = await limitedIp(request, env);
+
+  if (limited) return Response.json(LIMITED, { status: 429 });
+  const verdict = await checkEdit(body.data.code, (code) => trial(env, code));
+
+  if (!verdict.ok) return Response.json({ error: verdict.reason }, { status: 422 });
+
+  return saveVersion(env, id, verdict.code, "edit", ipHash);
+}
+
+async function revert(request: Request, env: Env, id: string): Promise<Response> {
+  const body = RevertRequest.safeParse(await request.json().catch(() => null));
+
+  if (!body.success) return Response.json({ error: "Send a version number." }, { status: 400 });
+  const { ipHash, limited } = await limitedIp(request, env);
+
+  if (limited) return Response.json(LIMITED, { status: 429 });
+  const target = (await versionsOf(env, id)).find((v) => v.version === body.data.version);
+
+  if (!target) return Response.json({ error: "This creature has no such version." }, { status: 404 });
+
+  return saveVersion(env, id, target.code, `revert to ${target.version}`, ipHash);
+}
+
+function creatureRoute(request: Request, env: Env, pathname: string): Promise<Response> | null {
+  const match = pathname.match(/^\/api\/creature\/([0-9a-f-]{36})(\/code|\/revert)?$/);
+  const id = match?.[1];
+
+  if (!id) return null;
+
+  if (!match[2] && request.method === "GET") return inspect(env, id);
+
+  if (match[2] === "/code" && request.method === "POST") return editCode(request, env, id);
+
+  if (match[2] === "/revert" && request.method === "POST") return revert(request, env, id);
+
+  return null;
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -121,6 +251,9 @@ export default {
     if (url.pathname === "/api/creatures" && request.method === "POST") return spawn(request, env);
 
     if (url.pathname === "/api/lineage") return lineage(env);
+    const creature = creatureRoute(request, env, url.pathname);
+
+    if (creature) return creature;
 
     if (url.pathname === "/api/floor") return serveObject(env, [FLOOR_KEY]);
     const sprite = url.pathname.match(/^\/api\/sprite\/([0-9a-f-]{36})$/);

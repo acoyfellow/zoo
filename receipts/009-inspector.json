@@ -1,0 +1,140 @@
+{
+  "schema": "zoo.receipt.v1",
+  "step": "009-inspector",
+  "status": "done",
+  "feature": {
+    "panel": "src/web/Inspector.svelte",
+    "highlight": "src/web/highlight.ts",
+    "api": [
+      "GET /api/creature/:id",
+      "POST /api/creature/:id/code",
+      "POST /api/creature/:id/revert"
+    ],
+    "validation": "src/worker/edit.ts checkEdit: validateBehavior then the 3-tick trial Dynamic Worker with globalOutbound null, cpuMs 50, 3000 ms timeout",
+    "versions": "D1 table code_versions (migrations/0002_code_versions.sql)",
+    "rate_limits": "front SPAWN_LIMIT shared with hatching (3 per minute); core 20 edits per hour per hashed IP",
+    "tests": [
+      "test/edit.test.ts",
+      "test/highlight.test.ts"
+    ]
+  },
+  "synthetic_creature": {
+    "id": "c7dd448d-8612-4367-ba9a-b463fef9b1cb",
+    "name": "Right",
+    "description": "a small grey pebble that rolls to the right"
+  },
+  "live_edits": [
+    {
+      "result": "rejected",
+      "status": 422,
+      "code_contains": "fetch(\"https://example.com\")",
+      "reason": "The static check rejected the code: forbidden token: fetch."
+    },
+    {
+      "result": "rejected",
+      "status": 422,
+      "code_contains": "for (;;) {}",
+      "reason": "The 3-tick trial did not finish: Error: Worker exceeded CPU time limit."
+    },
+    {
+      "result": "accepted",
+      "status": 200,
+      "version": 2,
+      "code": "api.move(-6, 0); api.say(\"edited by test\")",
+      "observed_live": "said = 'edited by test' and speech history recorded it within one tick"
+    },
+    {
+      "result": "accepted",
+      "status": 200,
+      "version": 3,
+      "note": "code that throws after tick 3 passed the trial, then lost energy each tick and faded; the world kept ticking"
+    }
+  ],
+  "versions_seen": [
+    [
+      3,
+      "edit"
+    ],
+    [
+      2,
+      "edit"
+    ],
+    [
+      1,
+      "original"
+    ]
+  ],
+  "ui": {
+    "screenshot": "docs/inspector.png",
+    "opened_by": "mouse click on the canvas",
+    "escape_closed": true,
+    "mobile_bottom_sheet": {
+      "viewport": "390x844",
+      "top": 688,
+      "bottom": 844,
+      "width": 390
+    },
+    "moving": [
+      "docs/moving-1.png",
+      "docs/moving-2.png"
+    ],
+    "interval_ms": 3000
+  },
+  "cleanup": {
+    "deleted_creatures": [
+      "c7dd448d-8612-4367-ba9a-b463fef9b1cb",
+      "d39a0af4-6c2d-4f99-9858-d8e53c1a85d7"
+    ],
+    "note": "d39a0af4-6c2d-4f99-9858-d8e53c1a85d7 (Fenramo) was bred from the synthetic creature",
+    "deleted_encounters": [
+      "a2b3e6c7-c04f-4446-a959-6a1aadae6c07",
+      "03caa336-4b4c-43f5-a5dc-27ef3cc4bcca",
+      "9348c681-75fe-4cfe-9437-944427c36154"
+    ],
+    "deleted_code_versions": [
+      [
+        "c7dd448d-8612-4367-ba9a-b463fef9b1cb",
+        1
+      ],
+      [
+        "c7dd448d-8612-4367-ba9a-b463fef9b1cb",
+        2
+      ],
+      [
+        "c7dd448d-8612-4367-ba9a-b463fef9b1cb",
+        3
+      ]
+    ],
+    "deleted_r2_objects": [
+      "zoo-sprites/sprites/c7dd448d-8612-4367-ba9a-b463fef9b1cb.jpg",
+      "zoo-sprites/sprites/c7dd448d-8612-4367-ba9a-b463fef9b1cb.256.jpg",
+      "zoo-sprites/sprites/d39a0af4-6c2d-4f99-9858-d8e53c1a85d7.jpg",
+      "zoo-sprites/sprites/d39a0af4-6c2d-4f99-9858-d8e53c1a85d7.256.jpg"
+    ],
+    "post_delete_counts": {
+      "creatures": 0,
+      "encounters": 0,
+      "code_versions": 0
+    },
+    "checks_404": {
+      "/api/creature/c7dd448d-8612-4367-ba9a-b463fef9b1cb": 404,
+      "/api/sprite/c7dd448d-8612-4367-ba9a-b463fef9b1cb": 404,
+      "/api/sprite/c7dd448d-8612-4367-ba9a-b463fef9b1cb?size=full": 404,
+      "/api/creature/d39a0af4-6c2d-4f99-9858-d8e53c1a85d7": 404,
+      "/api/sprite/d39a0af4-6c2d-4f99-9858-d8e53c1a85d7": 404,
+      "/api/sprite/d39a0af4-6c2d-4f99-9858-d8e53c1a85d7?size=full": 404
+    },
+    "lineage_mentions": 0
+  },
+  "incident_found": {
+    "symptom": "Every hatch failed with safety score 0.00",
+    "cause": "AiGatewayError 2021: Insufficient wholesale credits on AI Gateway 'default'",
+    "fix": "model calls go to the Workers AI binding without the gateway option (src/worker/ai.ts, src/worker/art.ts)"
+  },
+  "r2_cleanup": {
+    "bucket": "zoo-buttontest-sprites",
+    "objects_deleted": 3628,
+    "delete_bucket": "success",
+    "api_check": "GET bucket -> 10006 The specified bucket does not exist."
+  }
+}

@@ -112,6 +112,8 @@ export class WorldRenderer {
   private frameTimes: number[] = [];
   private pointers = new Map<number, Pointer>();
   private lastTap = 0;
+  private pressAt: Vec | null = null;
+  onSelect: ((id: string) => void) | null = null;
   private pinchStart = 0;
   private running = false;
   private readonly reducedMotion: boolean;
@@ -1095,6 +1097,7 @@ export class WorldRenderer {
       canvas.setPointerCapture(event.pointerId);
       this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       this.pinchStart = this.pinchDistance();
+      this.pressAt = this.pointers.size === 1 ? { x: event.clientX, y: event.clientY } : null;
       const now = performance.now();
 
       if (now - this.lastTap < 300) {
@@ -1128,6 +1131,15 @@ export class WorldRenderer {
     });
 
     const release = (event: PointerEvent) => {
+      const press = this.pressAt;
+      this.pressAt = null;
+
+      if (event.type === "pointerup" && press && Math.hypot(event.clientX - press.x, event.clientY - press.y) < 8) {
+        const picked = this.nearestBody(this.toWorld(event.clientX, event.clientY));
+
+        if (picked) this.onSelect?.(picked.creature.id);
+      }
+
       this.pointers.delete(event.pointerId);
       this.pinchStart = this.pinchDistance();
     };
