@@ -30,17 +30,6 @@ export function smallSpriteKey(id: string): string {
   return `sprites/${id}.256.jpg`;
 }
 
-async function shrink(images: ImagesBinding, image: Uint8Array): Promise<Uint8Array> {
-  const stream = new Blob([image]).stream();
-
-  const result = await images
-    .input(stream)
-    .transform({ width: 256, height: 256, fit: "cover" })
-    .output({ format: "image/jpeg", quality: 82 });
-
-  return new Uint8Array(await result.response().arrayBuffer());
-}
-
 export function spritePrompt(description: string): string {
   return `a single small ${description.trim().slice(0, 300)} creature, top-down three-quarter view, centered, full body, isolated on a pure black background, bioluminescent glow, cute game sprite, crisp edges, no text`;
 }
@@ -92,12 +81,11 @@ export async function paintSprite(env: Env, id: string, description: string): Pr
   for (let attempt = 0; attempt < SPRITE_ATTEMPTS; attempt++) {
     try {
       const image = await drawImage(env.AI, spritePrompt(description));
-      const small = await shrink(env.IMAGES, image).catch(() => image);
       const meta = { httpMetadata: { contentType: "image/jpeg" } };
       await env.SPRITES.put(spriteKey(id), image, meta);
-      await env.SPRITES.put(smallSpriteKey(id), small, meta);
+      await env.SPRITES.put(smallSpriteKey(id), image, meta);
 
-      return { ok: true, bytes: small.byteLength };
+      return { ok: true, bytes: image.byteLength };
     } catch (error) {
       reason = String(error).slice(0, 200);
     }

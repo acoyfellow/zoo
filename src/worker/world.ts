@@ -455,7 +455,7 @@ export class World extends DurableObject<Env> {
   }
 
   private shouldRun(): boolean {
-    return this.rows().length > 0 || this.ctx.getWebSockets().length > 0;
+    return this.ctx.getWebSockets().length > 0;
   }
 
   private startLoop(): void {
