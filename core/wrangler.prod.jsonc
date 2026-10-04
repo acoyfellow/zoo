@@ -12,5 +12,6 @@
   "d1_databases": [{ "binding": "DB", "database_name": "zoo-lineage", "database_id": "62464e95-8779-4889-9d20-2ed108bf5184", "migrations_dir": "../migrations" }],
   "durable_objects": { "bindings": [{ "name": "WORLD", "class_name": "World" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["World"] }],
+  "triggers": { "crons": ["* * * * *"] },
   "observability": { "enabled": true }
 }

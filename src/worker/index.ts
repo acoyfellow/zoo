@@ -1,6 +1,15 @@
 import { z } from "zod";
 import { CODE_MODEL, writeBehavior } from "./ai";
-import { FLOOR_KEY, isSafeEnough, SAFETY_THRESHOLD, safetyScore, serveObject, smallSpriteKey, spriteKey } from "./art";
+import {
+  FLOOR_KEY,
+  isSafeEnough,
+  paintSprite,
+  SAFETY_THRESHOLD,
+  safetyScore,
+  serveObject,
+  smallSpriteKey,
+  spriteKey,
+} from "./art";
 import { nameFrom, trialModule, type ValidationResult } from "./behavior";
 import { checkEdit, MAX_EDITS_PER_IP_PER_HOUR } from "./edit";
 import { CodeEdit, type EggStage, RevertRequest, SpawnRequest, TickResult } from "./schema";
@@ -242,7 +251,30 @@ function creatureRoute(request: Request, env: Env, pathname: string): Promise<Re
   return null;
 }
 
+const SPRITES_PER_SWEEP = 3;
+
+async function repaintMissingSprites(env: Env): Promise<void> {
+  const pending = await world(env).pendingSprites(SPRITES_PER_SWEEP);
+
+  for (const id of pending) {
+    const stored = await env.SPRITES.head(spriteKey(id));
+
+    const description = await env.DB.prepare("SELECT description FROM creatures WHERE id = ?")
+      .bind(id)
+      .first("description");
+
+    const painted = stored ? true : (await paintSprite(env, id, z.string().catch("").parse(description))).ok;
+
+    if (painted) await world(env).markSpriteReady(id);
+    else console.error("repaint failed", id);
+  }
+}
+
 export default {
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(repaintMissingSprites(env));
+  },
+
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 

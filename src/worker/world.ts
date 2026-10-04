@@ -68,7 +68,6 @@ type Row = z.infer<typeof Row>;
 export class World extends DurableObject<Env> {
   private tickCount = 0;
   private judging = false;
-  private backfilled = false;
   private events: WorldEvent[] = [];
   private encounters: EncounterView[] = [];
   private eggs = new Map<string, EggView>();
@@ -308,21 +307,16 @@ export class World extends DurableObject<Env> {
     }
   }
 
-  private async backfillSprites(): Promise<void> {
-    if (this.backfilled) return;
-    this.backfilled = true;
+  async pendingSprites(limit: number): Promise<string[]> {
+    return this.rows()
+      .filter((row) => row.sprite !== "ready")
+      .slice(0, limit)
+      .map((row) => row.id);
+  }
 
-    for (const row of this.rows()) {
-      if (row.sprite === "ready") continue;
-      const stored = await this.env.SPRITES.head(spriteKey(row.id));
-
-      if (stored) {
-        this.ctx.storage.sql.exec("UPDATE creatures SET sprite = 'ready' WHERE id = ?", row.id);
-        continue;
-      }
-
-      this.ctx.waitUntil(this.paint(row.id, await this.descriptionOf(row.id)));
-    }
+  async markSpriteReady(id: string): Promise<void> {
+    this.ctx.storage.sql.exec("UPDATE creatures SET sprite = 'ready' WHERE id = ?", id);
+    this.broadcast({ type: "sprite", id, sprite: "ready" });
   }
 
   async inspect(id: string): Promise<CreatureDetail | null> {
@@ -363,7 +357,6 @@ export class World extends DurableObject<Env> {
     if (request.headers.get("Upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });
     await this.ensureAlarm();
     await this.topUpStarters().catch((error) => console.error("top up failed", String(error)));
-    await this.backfillSprites().catch((error) => console.error("backfill failed", String(error)));
     const pair = new WebSocketPair();
     this.ctx.acceptWebSocket(pair[1]);
     pair[1].send(
