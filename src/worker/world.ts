@@ -63,6 +63,8 @@ export class World extends DurableObject<Env> {
   private eggs = new Map<string, EggView>();
   private stepCursor = 0;
   private loopTimer: ReturnType<typeof setTimeout> | null = null;
+  private paintQueue: Promise<void> = Promise.resolve();
+  private queuedPaints = new Set<string>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -181,7 +183,18 @@ export class World extends DurableObject<Env> {
     if (stage === "ready" || stage === "failed") this.eggs.delete(egg.id);
   }
 
-  private async paint(id: string, description: string, egg?: EggPlacement): Promise<void> {
+  private paint(id: string, description: string, egg?: EggPlacement): Promise<void> {
+    if (this.queuedPaints.has(id)) return this.paintQueue;
+    this.queuedPaints.add(id);
+    this.paintQueue = this.paintQueue
+      .then(() => this.paintNow(id, description, egg))
+      .catch((error) => console.error("paint failed", id, String(error)))
+      .finally(() => this.queuedPaints.delete(id));
+
+    return this.paintQueue;
+  }
+
+  private async paintNow(id: string, description: string, egg?: EggPlacement): Promise<void> {
     const result = await paintSprite(this.env, id, description);
     const state = result.ok ? "ready" : "glyph";
 
