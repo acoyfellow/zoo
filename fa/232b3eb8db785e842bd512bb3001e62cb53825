@@ -1,0 +1,23 @@
+src/worker/tick.ts
+  s_5f86db03525984::t_b016d1a6b2cc64 96-105
+src/worker/world.ts
+  s_5f86db03525984::t_975eb31fedbad4 36-47,79,144-151
+test/tick.test.ts
+  s_5f86db03525984::t_54c37ac7931d79 3,11,109-119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "fa232b3eb8db785e842bd512bb3001e62cb53825",
+  "prompts": {},
+  "sessions": {
+    "s_5f86db03525984": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0f8ed-6d1c-75dc-a1fe-8dce6a49abbc",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Jordan Coeyman <coeyman@gmail.com>"
+    }
+  }
+}
