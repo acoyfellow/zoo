@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  facetsToRelease,
   MIN_TICK_GAP_MS,
   nextAlarmAt,
   nextBatch,
@@ -7,6 +8,7 @@ import {
   runSteps,
   StepTimeout,
   TICK_MS,
+  touchFacet,
   WATCHDOG_MS,
   withTimeout,
 } from "../src/worker/tick";
@@ -102,5 +104,16 @@ describe("nextTickDelay", () => {
   });
   test("never waits less than the minimum gap after an overrun", () => {
     expect(nextTickDelay(0, TICK_MS * 3)).toBe(MIN_TICK_GAP_MS);
+  });
+});
+
+describe("live facet budget", () => {
+  test("touching moves an id to the most recent end", () => {
+    expect(touchFacet(["a", "b", "c"], "a")).toEqual(["b", "c", "a"]);
+  });
+
+  test("releases only the oldest ids beyond the budget", () => {
+    expect(facetsToRelease(["a", "b", "c", "d"], 2)).toEqual(["a", "b"]);
+    expect(facetsToRelease(["a"], 2)).toEqual([]);
   });
 });

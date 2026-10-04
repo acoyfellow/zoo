@@ -93,3 +93,13 @@ async function stepOne<T, R>(
     return outcome;
   }
 }
+
+export const MAX_LIVE_FACETS = 12;
+
+export function touchFacet(order: readonly string[], id: string): string[] {
+  return [...order.filter((existing) => existing !== id), id];
+}
+
+export function facetsToRelease(order: readonly string[], keep: number): string[] {
+  return order.slice(0, Math.max(0, order.length - keep));
+}

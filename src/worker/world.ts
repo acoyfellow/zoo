@@ -33,7 +33,18 @@ import {
   type WorldMessage,
 } from "./schema";
 import { STARTERS } from "./starters";
-import { MAX_STEPPED_PER_TICK, nextAlarmAt, nextBatch, nextTickDelay, runSteps, TICK_MS, WATCHDOG_MS } from "./tick";
+import {
+  facetsToRelease,
+  MAX_LIVE_FACETS,
+  MAX_STEPPED_PER_TICK,
+  nextAlarmAt,
+  nextBatch,
+  nextTickDelay,
+  runSteps,
+  TICK_MS,
+  touchFacet,
+  WATCHDOG_MS,
+} from "./tick";
 
 const MAX_ALIVE = 200;
 
@@ -65,6 +76,7 @@ export class World extends DurableObject<Env> {
   private loopTimer: ReturnType<typeof setTimeout> | null = null;
   private paintQueue: Promise<void> = Promise.resolve();
   private queuedPaints = new Set<string>();
+  private liveFacets: string[] = [];
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -129,6 +141,14 @@ export class World extends DurableObject<Env> {
   }
 
   private facet(row: Pick<Row, "id" | "code" | "version">): Fetcher {
+    this.liveFacets = touchFacet(this.liveFacets, row.id);
+
+    for (const idle of facetsToRelease(this.liveFacets, MAX_LIVE_FACETS)) {
+      this.ctx.facets.abort(idle, new Error("released to save memory"));
+    }
+
+    this.liveFacets = this.liveFacets.slice(-MAX_LIVE_FACETS);
+
     return this.ctx.facets.get(row.id, async () => {
       const worker = this.env.LOADER.get(`creature-${row.id}-v${row.version}`, () => ({
         compatibilityDate: "2026-09-04",
