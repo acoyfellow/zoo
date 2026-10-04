@@ -1,0 +1,23 @@
+core/wrangler.prod.jsonc
+  s_5f86db03525984::t_a5eeef47b7ea53 15
+src/worker/index.ts
+  s_5f86db03525984::t_fd80ef236a6733 3-12,254-272,274-277
+src/worker/world.ts
+  s_5f86db03525984::t_d550f71484152a 310-315,317-319
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "9cd8542ffb5d3ba43739e222673c28df90cbe893",
+  "prompts": {},
+  "sessions": {
+    "s_5f86db03525984": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0f8ed-6d1c-75dc-a1fe-8dce6a49abbc",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Jordan Coeyman <coeyman@gmail.com>"
+    }
+  }
+}
